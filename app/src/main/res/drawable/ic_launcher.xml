@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <path
+        android:fillColor="#0D0E11"
+        android:pathData="M24,1A23,23 0 1,0 24,47A23,23 0 1,0 24,1Z" />
+
+    <!-- 24 h bezel, cardinal marks heavy -->
+    <path
+        android:strokeColor="#E0E6ED"
+        android:strokeWidth="2.6"
+        android:pathData="M24,3 L24,8 M24,40 L24,45 M3,24 L8,24 M40,24 L45,24" />
+    <path
+        android:strokeColor="#8CE0E6ED"
+        android:strokeWidth="1.4"
+        android:pathData="M34.5,5.8 L32,10.1 M42.2,13.5 L37.9,16 M42.2,34.5 L37.9,32 M34.5,42.2 L32,37.9 M13.5,42.2 L16,37.9 M5.8,34.5 L10.1,32 M5.8,13.5 L10.1,16 M13.5,5.8 L16,10.1" />
+
+    <!-- 24 h hour hand pointing at 18:00, minute hand up -->
+    <path
+        android:fillColor="#E0E6ED"
+        android:pathData="M24,22.4 L35,23.2 L35,24.8 L24,25.6 Z" />
+    <path
+        android:fillColor="#E0E6ED"
+        android:pathData="M23.2,24 L24.8,24 L24.4,9 L23.6,9 Z" />
+    <path
+        android:fillColor="#FFB300"
+        android:pathData="M24,26.6A2.6,2.6 0 1,0 24,21.4A2.6,2.6 0 1,0 24,26.6Z" />
+</vector>

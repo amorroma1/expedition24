@@ -1,0 +1,24 @@
+# --- Build output -----------------------------------------------------------------------------
+.gradle/
+build/
+*.apk
+*.aab
+
+# --- Local machine ----------------------------------------------------------------------------
+# local.properties carries the SDK path, which is per-machine by definition.
+local.properties
+.idea/
+*.iml
+.vs/
+.kotlin/
+.DS_Store
+captures/
+
+# --- Generated, and cheap to regenerate -------------------------------------------------------
+# Overpass snapshots: an intermediate cache for tools/poi/build_poi.py. The CSVs it produces are
+# committed, so the build never needs these, and a megabyte of raw JSON is not worth versioning.
+# Refetch with tools/poi/fetch_osm.py.
+tools/poi/raw/
+
+# Default output of tools/poi/preview_glyphs.py, which is a thing you look at, not a thing you keep.
+tools/poi/glyph_preview.png

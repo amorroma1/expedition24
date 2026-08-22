@@ -1,0 +1,137 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 R. Kravcov
+
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push supersedes an older one; there is nothing to learn from finishing the old run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # JDK 17 and not something newer on purpose: :tools:poi asks for jvmToolchain(17), and making
+      # the build JDK the same version means Gradle never has to go looking for a second one. With
+      # a mismatch it fails at configuration time with "no locally installed toolchains match".
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # The specification for everything that cannot be eyeballed: dial angles, MSD/MTC and lunar
+      # time, sunrise and sunset, the Morton range query against brute force, the motion band-pass,
+      # the site pictogram rules and the weather cache.
+      # One flavor's JVM tests: the flavors share every class under test.
+      - name: Unit tests
+        run: ./gradlew :app:testEarthDebugUnitTest
+
+      # Lint fails the build on errors by default; almost free here, because the lint model is
+      # already produced on the release path below.
+      - name: Lint
+        run: ./gradlew :app:lintEarthDebug
+
+      - name: Assemble debug
+        run: ./gradlew :app:assembleDebug
+
+      # Release is where R8 and the resource shrinker run, and they fail differently from debug: a
+      # missing keep rule for a manifest component only ever shows up here. The APK comes out
+      # unsigned because the sideloading key belongs to the workshop machine, not to the project --
+      # see the signingConfigs block in app/build.gradle.kts.
+      - name: Assemble release, exercising R8
+        run: ./gradlew :app:assembleRelease
+
+      # This has been wrong twice, both times with a green build: the POI index is produced by a
+      # generator task, and when its wiring to the asset source set breaks the app simply ships
+      # without it and silently never resolves a site. It also has to stay uncompressed, because
+      # PoiDatabase reads it through a random-access ByteBuffer straight out of the APK.
+      - name: The POI index is present and stored uncompressed
+        run: |
+          python3 - <<'EOF'
+          import glob, sys, zipfile
+          failures = []
+          apks = sorted(glob.glob("app/build/outputs/apk/**/*.apk", recursive=True))
+          if not apks:
+              sys.exit("no APK was produced")
+          for apk in apks:
+              names = zipfile.ZipFile(apk).namelist()
+              entry = "assets/poi_v1.bin"
+              if entry not in names:
+                  failures.append("%s: %s is missing" % (apk, entry))
+                  continue
+              info = zipfile.ZipFile(apk).getinfo(entry)
+              if info.compress_type != zipfile.ZIP_STORED:
+                  failures.append("%s: %s is compressed" % (apk, entry))
+              else:
+                  print("%s: %s, %d bytes, stored" % (apk, entry, info.file_size))
+          if failures:
+              sys.exit("\n".join(failures))
+          EOF
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: |
+            app/build/reports/tests/testEarthDebugUnitTest
+            app/build/test-results/testEarthDebugUnitTest
+          if-no-files-found: warn
+
+      # Globbed rather than named: with no signing key the release output is
+      # app-release-unsigned.apk, and naming it app-release.apk would quietly upload nothing.
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+
+  conventions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Self-enforcing, because a licence convention that relies on remembering is not one.
+      - name: Every source file carries an SPDX identifier
+        run: |
+          missing=$(git ls-files -z '*.kt' '*.kts' '*.py' \
+            | xargs -0 grep -L 'SPDX-License-Identifier' || true)
+          if [ -n "$missing" ]; then
+            echo "::error::source files without an SPDX header:"
+            printf '%s\n' "$missing"
+            exit 1
+          fi
+          echo "all $(git ls-files '*.kt' '*.kts' '*.py' | wc -l) source files carry one"
+
+      # gradlew is run by /bin/sh. A CRLF checkout fails with "bad interpreter" and a
+      # non-executable one fails with "permission denied" -- neither is visible on Windows,
+      # which is where this project is developed.
+      - name: The Gradle wrapper is usable on a Unix checkout
+        run: |
+          test -x gradlew || { echo "::error::gradlew is not executable (git update-index --chmod=+x gradlew)"; exit 1; }
+          if grep -qU $'\r' gradlew; then
+            echo "::error::gradlew has CRLF line endings; .gitattributes should pin it to LF"
+            exit 1
+          fi
+          echo "gradlew: executable, LF"

@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.hardware.type.watch" />
+
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- A watch face is a WallpaperService and the refresh job is a background worker, so neither
+         counts as foreground location use on API 29+. Without this the platform quietly returns
+         null instead of an error, which is indistinguishable from having no signal. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- End-of-watch signal. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!--
+      Both are for the optional readouts beside the hub and nothing else, both are off by default,
+      and neither is requested until a slot is actually set to the reading that needs it. There is
+      no permission for the barometer, which is why it is the one that always works.
+    -->
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- Vigilance monitoring has to keep sensing with the screen off, which a wallpaper is not
+         allowed to do on its own. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Runtime-gated from API 33. Without it the vigilance service still runs, but its ongoing
+         notification is invisible — the user loses both the sign that something is spending
+         battery and the system's own way of stopping it. The editor asks when vigilance goes on. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Required from API 34 for the declared service type; ignored on the API 30 watches this
+         targets, but a service without a type crashes outright on newer ones. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="false"
+        android:theme="@android:style/Theme.DeviceDefault">
+
+        <uses-library
+            android:name="com.google.android.wearable"
+            android:required="false" />
+
+        <!-- Runs without a phone companion. -->
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="true" />
+
+        <service
+            android:name=".MfdWatchFaceService"
+            android:directBootAware="true"
+            android:exported="true"
+            android:label="@string/watch_face_name"
+            android:permission="android.permission.BIND_WALLPAPER">
+
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+                <category android:name="com.google.android.wearable.watchface.category.WATCH_FACE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/watch_face" />
+
+            <meta-data
+                android:name="com.google.android.wearable.watchface.preview"
+                android:resource="@drawable/preview" />
+
+            <meta-data
+                android:name="com.google.android.wearable.watchface.preview_circular"
+                android:resource="@drawable/preview" />
+
+            <!-- Points the system's "Customise" affordance at our on-watch editor activity. -->
+            <meta-data
+                android:name="com.google.android.wearable.watchface.wearableConfigurationAction"
+                android:value="androidx.wear.watchface.editor.action.WATCH_FACE_EDITOR" />
+
+            <meta-data
+                android:name="androidx.wear.watchface.MULTIPLE_INSTANCES_ALLOWED"
+                android:value="true" />
+        </service>
+
+        <activity
+            android:name=".editor.WatchConfigActivity"
+            android:exported="true"
+            android:label="@string/config_title"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.DeviceDefault">
+            <intent-filter>
+                <action android:name="androidx.wear.watchface.editor.action.WATCH_FACE_EDITOR" />
+                <category android:name="com.google.android.wearable.watchface.category.WEARABLE_CONFIGURATION" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- The log's exits: a QR for the camera and a Bell 202 burst for the microphone, one
+             LogPacket for both. Read-only; reached only from the editor. -->
+        <activity
+            android:name=".export.LogExportActivity"
+            android:exported="false"
+            android:label="@string/editor_tx_log"
+            android:theme="@android:style/Theme.DeviceDefault" />
+
+        <!-- The repository as a QR, from the ABOUT section: a watch has no browser. -->
+        <activity
+            android:name=".export.RepoLinkActivity"
+            android:exported="false"
+            android:label="@string/editor_about_github"
+            android:theme="@android:style/Theme.DeviceDefault" />
+
+        <!-- The release page as a QR: the whole of what this app does about updates, because Wear
+             OS does not let an app install an app. Reached from ABOUT and from the notification. -->
+        <activity
+            android:name=".update.ReleaseLinkActivity"
+            android:exported="false"
+            android:label="@string/editor_about_update"
+            android:theme="@android:style/Theme.DeviceDefault" />
+
+        <service
+            android:name=".data.VigilanceService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
+        <!-- Fires when a watch runs out. directBootAware so a watch started before a reboot still
+             ends on time even if the user has not unlocked yet. -->
+        <receiver
+            android:name=".WatchShiftReceiver"
+            android:directBootAware="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.avdesign.mfd24.action.WATCH_STARTED" />
+                <action android:name="com.avdesign.mfd24.action.WATCH_EXPIRED" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>

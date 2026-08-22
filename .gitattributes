@@ -1,0 +1,35 @@
+# Normalise to LF in the repository and check out native on Windows.
+* text=auto
+
+# --- Files whose line endings are load-bearing -------------------------------------------------
+# gradlew is run by /bin/sh. A CRLF checkout makes it fail with "bad interpreter", which on a
+# Windows machine is invisible until someone builds on CI or a Mac.
+gradlew         text eol=lf
+*.sh            text eol=lf
+# The Windows launcher is the mirror image: cmd.exe wants CRLF.
+gradlew.bat     text eol=crlf
+*.cmd           text eol=crlf
+
+# --- Binary ------------------------------------------------------------------------------------
+*.jar           binary
+*.png           binary
+*.jpg           binary
+*.webp          binary
+*.ttf           binary
+*.keystore      binary
+# The packed POI index is never committed, but say so in case someone tries.
+*.bin           binary
+
+# --- Generated sources, collapsed in GitHub diffs ----------------------------------------------
+# Produced by tools/poi/build_poi.py from an Overpass snapshot. Reviewing a 2000-line diff of
+# machine-derived coordinates is not a review; read the generator instead.
+tools/poi/data/navalbases.csv   linguist-generated=true
+tools/poi/data/heliports.csv    linguist-generated=true
+
+# The hand-curated sources are the opposite: small, and every line is a decision.
+tools/poi/data/spaceports.csv   -linguist-generated
+
+# --- Language detection ------------------------------------------------------------------------
+# Otherwise GitHub reports this as a CSV project.
+tools/poi/data/*.csv            linguist-detectable=false
+docs/*                          linguist-documentation

@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MFD-24</string>
+    <string name="watch_face_name">MFD-24</string>
+    <string name="config_title">MFD-24</string>
+
+    <!-- Planet mode -->
+
+    <!-- Lume palette -->
+    <string name="style_palette_name">Lume palette</string>
+    <string name="style_palette_desc">Colour of the dial markings</string>
+    <string name="palette_green">PHOSPHOR GREEN</string>
+    <string name="palette_green_sr">Phosphor green</string>
+    <string name="palette_amber">ALERT AMBER</string>
+    <string name="palette_amber_sr">Alert amber</string>
+    <string name="palette_red">NVG NIGHT RED</string>
+    <string name="palette_red_sr">Night vision red</string>
+
+    <!-- Temperature unit -->
+    <string name="style_temp_name">Temperature</string>
+    <string name="style_temp_desc">Units used in the telemetry window</string>
+    <string name="temp_celsius">CELSIUS</string>
+    <string name="temp_celsius_sr">Degrees Celsius</string>
+    <string name="temp_fahrenheit">FAHRENHEIT</string>
+    <string name="temp_fahrenheit_sr">Degrees Fahrenheit</string>
+
+    <!-- Pressure unit -->
+    <string name="style_pressure_name">Pressure</string>
+    <string name="style_pressure_desc">QNH units used in the telemetry window</string>
+    <string name="pressure_hpa">HECTOPASCAL</string>
+    <string name="pressure_hpa_sr">Hectopascal, hPa</string>
+    <string name="pressure_mmhg">MM HG</string>
+    <string name="pressure_mmhg_sr">Millimetres of mercury</string>
+
+    <!-- Watch (shift) timer -->
+
+    <!-- Midnight numeral -->
+    <string name="style_midnight_name">Midnight mark</string>
+    <string name="style_midnight_desc">Whether midnight reads as the start or the end of the day</string>
+    <string name="midnight_00">00</string>
+    <string name="midnight_00_sr">Midnight shown as zero zero</string>
+    <string name="midnight_24">24</string>
+    <string name="midnight_24_sr">Midnight shown as twenty four</string>
+
+
+
+    <!-- Dial orientation -->
+    <string name="style_dial_top_name">Dial top</string>
+    <string name="style_dial_top_desc">Which end of the day sits at the top of the 24 hour scale</string>
+    <string name="dial_top_noon">NOON UP</string>
+    <string name="dial_top_noon_sr">Noon at the top, midnight at the bottom</string>
+    <string name="dial_top_midnight">MIDNIGHT UP</string>
+    <string name="dial_top_midnight_sr">Midnight at the top, noon at the bottom</string>
+
+    <!-- Daylight band -->
+    <string name="style_nadir_name">Nadir</string>
+    <string name="style_nadir_desc">Shade the hours between sunrise and sunset at your position</string>
+    <string name="nadir_off">OFF</string>
+    <string name="nadir_off_sr">Daylight band hidden</string>
+    <string name="nadir_on">ON</string>
+    <string name="nadir_on_sr">Daylight band shown</string>
+
+    <!-- Weather -->
+    <string name="style_solar_name">Solar mark</string>
+    <string name="style_solar_desc">The sun\'s true position on the Nadir band</string>
+    <string name="solar_off">OFF</string>
+    <string name="solar_off_sr">Solar mark off</string>
+    <string name="solar_on">ON</string>
+    <string name="solar_on_sr">Solar mark on: the sun\'s position on the daylight band</string>
+    <string name="editor_label_solar">SOLAR MARK</string>
+    <string name="editor_solar_note">Point it at the sun and the dial is a compass</string>
+
+    <string name="style_lunar_name">Lunar mark</string>
+    <string name="style_lunar_desc">The moon\'s position and phase on the sky ring</string>
+    <string name="lunar_off">OFF</string>
+    <string name="lunar_off_sr">Lunar mark off</string>
+    <string name="lunar_on">ON</string>
+    <string name="lunar_on_sr">Lunar mark on: the moon\'s position and phase</string>
+    <string name="editor_label_lunar">LUNAR MARK</string>
+    <string name="editor_lunar_note">The moon with its true phase — the same compass by night</string>
+
+    <string name="style_weather_name">Weather</string>
+    <string name="style_weather_desc">Fetch and show the weather row</string>
+    <string name="weather_on">ON</string>
+    <string name="weather_on_sr">Weather row shown</string>
+    <string name="weather_off">OFF</string>
+    <string name="weather_off_sr">Weather row hidden</string>
+
+    <!-- Vigilance monitoring -->
+    <string name="style_vigilance_name">Vigilance monitoring</string>
+    <string name="style_vigilance_desc">Check the operator is responsive while a watch is under way</string>
+    <string name="vigilance_off">OFF</string>
+    <string name="vigilance_off_sr">Vigilance monitoring off</string>
+    <string name="vigilance_on">ON</string>
+    <string name="vigilance_on_sr">Vigilance monitoring on</string>
+    <string name="style_vigilance_interval_name">Check interval</string>
+    <string name="style_vigilance_interval_desc">How long between checks</string>
+    <string name="style_vibe_name">Vibration strength</string>
+    <string name="style_vibe_desc">How hard the nudge and the SOS buzz</string>
+    <string name="vibe_low">LOW</string>
+    <string name="vibe_low_sr">Light buzz</string>
+    <string name="vibe_med">MED</string>
+    <string name="vibe_med_sr">Medium buzz</string>
+    <string name="vibe_high">HIGH</string>
+    <string name="vibe_high_sr">Strong buzz, felt through a sleeve</string>
+    <string name="vigilance_5">5 MIN</string>
+    <string name="vigilance_5_sr">Check every five minutes</string>
+    <string name="vigilance_10">10 MIN</string>
+    <string name="vigilance_10_sr">Check every ten minutes</string>
+    <string name="vigilance_15">15 MIN</string>
+    <string name="vigilance_15_sr">Check every fifteen minutes</string>
+    <string name="vigilance_channel">Vigilance monitoring</string>
+    <string name="vigilance_notification">Watch under way — monitoring</string>
+
+    <!-- Editor UI -->
+    <string name="editor_section_vigilance">VIGILANCE</string>
+    <string name="editor_label_vigilance_interval">CHECK INTERVAL</string>
+    <string name="editor_label_vibe">VIBE STRENGTH</string>
+    <string name="editor_label_sos_sound">SOS SOUND</string>
+    <string name="editor_sos_sound_note">Felt once, then sounded twice — the tone is for whoever finds you</string>
+    <string name="editor_label_log_hr">LOG PULSE</string>
+    <string name="editor_log_hr_note">Pulse during a missed check, against your last moving reading</string>
+    <string name="sos_off">OFF</string>
+    <string name="sos_off_sr">Silent, wrist only</string>
+    <string name="sos_low">LOW</string>
+    <string name="sos_low_sr">Low volume</string>
+    <string name="sos_med">MED</string>
+    <string name="sos_med_sr">Medium volume</string>
+    <string name="sos_high">HIGH</string>
+    <string name="sos_high_sr">High volume</string>
+    <string name="log_hr_off">OFF</string>
+    <string name="log_hr_off_sr">Pulse not recorded</string>
+    <string name="log_hr_on">ON</string>
+    <string name="log_hr_on_sr">Record pulse with incidents</string>
+    <string name="style_sos_name">SOS sound</string>
+    <string name="style_sos_desc">How loudly an unanswered check calls out</string>
+    <string name="style_log_hr_name">Pulse in the log</string>
+    <string name="style_log_hr_desc">Record heart rate with an incident</string>
+    <string name="editor_vigilance_needs_watch">Only while a duty runs</string>
+    <string name="editor_vigilance_doze">In deep sleep a check can stretch to 9 minutes</string>
+    <string name="editor_vigilance_notifications">Allow notifications to keep the monitor visible</string>
+    <string name="editor_label_incidents">INCIDENTS</string>
+    <string name="editor_section_sensors">SENSORS</string>
+    <string name="editor_label_sensor_left">LEFT OF HUB</string>
+    <string name="editor_label_sensor_right">RIGHT OF HUB</string>
+    <string name="editor_sensor_needs_permission">Tap again to allow the sensor</string>
+    <string name="style_sensor_left_name">Left readout</string>
+    <string name="style_sensor_right_name">Right readout</string>
+    <string name="style_sensor_desc">Optional sensor beside the hub</string>
+    <string name="sensor_off">OFF</string>
+    <string name="sensor_off_sr">Off</string>
+    <string name="sensor_hr">HR</string>
+    <string name="sensor_hr_sr">Heart rate</string>
+    <string name="sensor_steps">STP</string>
+    <string name="sensor_steps_sr">Steps today</string>
+    <string name="sensor_qfe">QFE</string>
+    <string name="sensor_qfe_sr">Station pressure</string>
+    <string name="editor_incidents_none">None on record</string>
+    <string name="editor_tx_log">EXPORT LOG · QR + ♪</string>
+    <string name="editor_tx_caption">QR plus Bell 202 tones — receive with: minimodem --rx 1200</string>
+    <string name="export_sounding">TX ♪ 1200 Bd AFSK</string>
+    <string name="export_idle">TAP TO REPLAY ♪</string>
+    <string name="editor_incidents_clear">CLEAR LOG</string>
+    <string name="editor_label_dial_top">DIAL TOP</string>
+    <string name="editor_label_nadir">NADIR</string>
+    <string name="editor_label_weather">WEATHER</string>
+    <string name="editor_section_position">POSITION</string>
+    <string name="editor_location_device">LOCATION ON</string>
+    <string name="editor_location_manual">MANUAL POSITION</string>
+    <string name="editor_location_none">LOCATION OFF</string>
+    <string name="editor_position_device_sub">Weather, Nadir and site lock</string>
+    <string name="editor_position_manual_sub">Hand-typed, to a hundredth of a degree</string>
+    <string name="editor_position_none_sub">Tap to allow, or set a position below</string>
+    <string name="style_ambient_density_name">Always-on density</string>
+    <string name="style_ambient_density_desc">Thin the face to every other pixel</string>
+    <string name="ambient_full">SOLID</string>
+    <string name="ambient_full_sr">Solid: every pixel lit</string>
+    <string name="ambient_half">HALVED</string>
+    <string name="ambient_half_sr">Halved: every other pixel, alternating each minute</string>
+    <string name="ambient_auto">AUTO</string>
+    <string name="ambient_auto_sr">Auto: halved after sunset, solid by day and during a watch</string>
+    <string name="editor_label_ambient">ALWAYS-ON</string>
+    <string name="editor_position_auto">AUTOMATIC</string>
+    <string name="editor_position_manual">MANUAL</string>
+    <string name="editor_manual_lat">LAT %1$s</string>
+    <string name="editor_manual_lon">LON %1$s</string>
+    <string name="editor_manual_apply">USE THIS POSITION</string>
+    <string name="editor_manual_clear">CLEAR POSITION</string>
+    <string name="editor_nadir_needs_position">Needs a position</string>
+    <string name="editor_section_watch">DUTY CONTROL</string>
+    <string name="editor_start_watch">START NOW</string>
+    <string name="editor_end_watch">END DUTY</string>
+    <string name="editor_schedule_watch">ARM TIMER</string>
+    <string name="editor_watch_running">Ends in %1$s</string>
+    <string name="editor_watch_pending">Begins in %1$s</string>
+    <string name="editor_watch_served">Last duty served</string>
+    <string name="editor_label_schedule">SCHEDULE</string>
+    <string name="editor_label_duration">DURATION</string>
+    <string name="editor_section_display">DISPLAY</string>
+    <string name="editor_label_temperature">TEMPERATURE</string>
+    <string name="editor_label_pressure">PRESSURE</string>
+    <string name="editor_seg_dial_noon">NOON</string>
+    <string name="editor_seg_dial_midnight">MIDNIGHT</string>
+    <string name="editor_seg_palette_amber">AMBER</string>
+    <string name="editor_seg_palette_green">GREEN</string>
+    <string name="editor_seg_palette_red">RED</string>
+    <string name="editor_seg_temp_celsius">°C</string>
+    <string name="editor_seg_temp_fahrenheit">°F</string>
+    <string name="editor_seg_pressure_hpa">hPa</string>
+    <string name="editor_seg_pressure_mmhg">mmHg</string>
+    <string name="editor_label_midnight">MIDNIGHT MARK</string>
+    <string name="editor_duration_4h">4h</string>
+    <string name="editor_duration_4h_sr">Four hours</string>
+    <string name="editor_duration_8h">8h</string>
+    <string name="editor_duration_8h_sr">Eight hours</string>
+    <string name="editor_duration_12h">12h</string>
+    <string name="editor_duration_12h_sr">Twelve hours</string>
+    <string name="editor_duration_custom">CST</string>
+    <string name="editor_duration_custom_sr">Custom length, set below in five-minute steps</string>
+    <!-- Hours and minutes of a duty length, e.g. 07:35. -->
+    <string name="editor_duration_value">%1$02d:%2$02d</string>
+    <!-- Start time of a scheduled duty, e.g. 06:35. -->
+    <string name="editor_start_time">%1$02d:%2$02d</string>
+    <string name="editor_step_down">–</string>
+    <string name="editor_step_up">+</string>
+    <string name="editor_label_palette">LUME PALETTE</string>
+    <string name="editor_section_units">UNITS</string>
+    <string name="editor_location_rationale">Weather and the site lock need your position</string>
+    <string name="editor_background_location">ALLOW ALL THE TIME</string>
+    <string name="editor_background_rationale">The half-hourly refresh needs location “all the time”</string>
+    <string name="editor_ambient_auto_note">Thins after sunset, never during a watch</string>
+    <string name="editor_done">DONE</string>
+
+    <!-- ABOUT: version, the repository as a QR, and the update path. -->
+    <string name="editor_section_about">ABOUT</string>
+    <string name="editor_about_version">MFD-24 %1$s · build %2$d</string>
+    <string name="editor_about_github">GITHUB · QR</string>
+    <string name="editor_about_update">RELEASES</string>
+    <string name="editor_about_update_available">UPDATE AVAILABLE</string>
+    <string name="release_qr_version">MFD-24 %1$s</string>
+    <string name="release_qr_latest">MFD-24 RELEASES</string>
+    <string name="editor_about_update_note">Release page as a QR — notes, checksum, APK. Installing needs adb</string>
+    <string name="about_qr_top">MFD-24 %1$s</string>
+    <string name="editor_label_hints">HINTS</string>
+    <string name="editor_hints_note">The small print under each row. Off once you know your way around.</string>
+    <string name="hints_on">ON</string>
+    <string name="hints_on_sr">Show the explanatory lines</string>
+    <string name="hints_off">OFF</string>
+    <string name="hints_off_sr">Hide the explanatory lines</string>
+    <string name="editor_label_update_check">RELEASE CHECK</string>
+    <string name="editor_update_check_note">Asks GitHub once a day, off duty. Never downloads</string>
+    <string name="update_check_on">ON</string>
+    <string name="update_check_on_sr">Check for releases daily</string>
+    <string name="update_check_off">OFF</string>
+    <string name="update_check_off_sr">Never check for releases</string>
+    <string name="update_channel_name">Release updates</string>
+    <string name="update_notification_title">MFD-24 %1$s is out</string>
+    <string name="update_notification_text">Open to read what changed and install.</string>
+
+    <!-- Spoken by TalkBack over the face; the library already announces the time itself. -->
+    <string name="a11y_on_duty">On duty</string>
+    <string name="a11y_duty_booked">Watch booked</string>
+    <string name="a11y_off_duty">Off duty</string>
+    <string name="a11y_man_down">Man down — double-tap to clear</string>
+    <string name="a11y_off_wrist">Off the wrist — vigilance suspended</string>
+</resources>
