@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 R. Kravcov -->
+<!-- The Mars face installs beside the Earth one, so the names the system shows — launcher,
+     face picker, editor title — must say which world this instrument keeps. Everything else
+     is shared: only the identity moves. -->
+<resources>
+    <string name="app_name">MFD-24-Mars</string>
+    <string name="watch_face_name">MFD-24-Mars</string>
+    <string name="config_title">MFD-24-Mars</string>
+</resources>

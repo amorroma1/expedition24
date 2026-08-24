@@ -133,6 +133,8 @@ def main():
         # They are drawn a shade smaller than the site set, at about 17 px rather than 22.
         ("heart", "SLOT\npulse"),
         ("pedestrian", "SLOT\nsteps"),
+        # The Mars readout's light-time label: a ground-station dish, at symbol size.
+        ("dish", "MARS\nlight time"),
     ]
     if args.only:
         wanted = {n.strip() for n in args.only.split(",")}

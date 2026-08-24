@@ -10,6 +10,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import com.avdesign.mfd24.astro.AstroTime
 import com.avdesign.mfd24.astro.PlanetMode
+import com.avdesign.mfd24.astro.Rovers
 import com.avdesign.mfd24.data.TelemetryState
 import com.avdesign.mfd24.data.VigilanceState
 import com.avdesign.mfd24.data.WatchShiftState
@@ -88,10 +89,21 @@ class TelemetryLayer {
     private val line1 = TextBuf(40)
     private val line2 = TextBuf(40)
 
+    /**
+     * The tail of the Mars third row — the light time or the conjunction flag — kept apart from
+     * [line1] because an Earth pictogram sits between them: a bare `14M22S` read as nothing in
+     * particular, and `OWLT` does not fit the row, so the glyph is the label.
+     */
+    private val line1Tail = TextBuf(8)
+
     /** Built with its left edge at the dial centre; drawing translates it into place. */
     private val symbolPath = Path()
     private var symbolMode = -1
     private var symbolLayout = -1
+
+    /** The ground-station dish labelling the light-time figure; rebuilt with the layout. */
+    private val dishTailPath = Path()
+    private var dishTailLayout = -1
 
     private val glyphPath = Path()
 
@@ -123,8 +135,15 @@ class TelemetryLayer {
         sensorRight: Int,
         layoutGeneration: Int,
         frameSymbol: Boolean,
+        roverIndex: Int,
+        relayValid: Boolean,
+        owltSeconds: Int,
+        conjunction: Boolean,
     ) {
-        buildLines(state, planetMode, epochMillis, fahrenheit, mmHg)
+        buildLines(
+            state, planetMode, epochMillis, fahrenheit, mmHg, roverIndex, relayValid,
+            owltSeconds, conjunction,
+        )
         if (vigilanceStatus == VigilanceState.INCIDENT) {
             buildIncident(incidentMillis, incidentElapsedMillis)
         } else {
@@ -177,10 +196,21 @@ class TelemetryLayer {
                 symbolMode = planetMode
                 symbolLayout = layoutGeneration
             }
-            drawGlyphedLine(
-                canvas, g, palette.lume, symbolPath,
-                g.symbolBox.width(), g.symbolBox.height(), line1, g.telemetryLineY[2],
-            )
+            if (line1Tail.length > 0) {
+                if (dishTailLayout != layoutGeneration) {
+                    Glyphs.buildDishSymbol(g.symbolBox, dishTailPath)
+                    dishTailLayout = layoutGeneration
+                }
+                drawTwinGlyphedLine(
+                    canvas, g, palette.lume, symbolPath, line1,
+                    dishTailPath, line1Tail, g.telemetryLineY[2],
+                )
+            } else {
+                drawGlyphedLine(
+                    canvas, g, palette.lume, symbolPath,
+                    g.symbolBox.width(), g.symbolBox.height(), line1, g.telemetryLineY[2],
+                )
+            }
         } else if (line1.length > 0) {
             drawHaloed(canvas, line1, g.cx, g.telemetryLineY[2])
         }
@@ -214,6 +244,62 @@ class TelemetryLayer {
             drawHaloed(canvas, line2, g.cx, g.telemetryLineY[3])
         }
     }
+
+    /**
+     * Draws two pictogram-and-text pairs as one centred group: the reference-frame symbol with
+     * the sol, then the ground-station dish with the light time — the glyph standing where a
+     * label would, because `OWLT` does not fit the row and a bare duration reads as nothing in
+     * particular. Same translate discipline as [drawGlyphedLine]; both paths share the symbol
+     * box, so the two glyphs sit at one size.
+     */
+    private fun drawTwinGlyphedLine(
+        canvas: Canvas,
+        g: Geometry,
+        glyphColor: Int,
+        leadPath: Path,
+        leadText: TextBuf,
+        tailPath: Path,
+        tailText: TextBuf,
+        baselineY: Float,
+    ) {
+        val glyphWidth = g.symbolBox.width()
+        val glyphHeight = g.symbolBox.height()
+        val leadWidth = textPaint.measureText(leadText.chars, 0, leadText.length)
+        val tailWidth = textPaint.measureText(tailText.chars, 0, tailText.length)
+        // The dish sits almost against its figure — it is that figure's label, and a label a
+        // gap away read as one more item in the row; the full gap stays where the two pairs
+        // separate. It also rides a couple of pixels high: its visual mass is the bowl at the
+        // bottom of the box, and on the shared baseline it hung below the digits' centre.
+        val tailGap = g.glyphGap * DISH_GAP_FRACTION
+        val tailLift = g.r * DISH_LIFT_FRACTION
+        val groupWidth = glyphWidth + g.glyphGap + leadWidth +
+            g.glyphGap + glyphWidth + tailGap + tailWidth
+        val left = g.cx - groupWidth / 2f
+        val dy = (metrics.ascent + metrics.descent) / 2f + glyphHeight / 2f
+
+        glyphPaint.color = glyphColor
+        canvas.save()
+        canvas.translate(left - g.cx, dy)
+        canvas.drawPath(leadPath, symbolHaloPaint)
+        canvas.drawPath(leadPath, glyphPaint)
+        canvas.restore()
+
+        val tailGlyphLeft = left + glyphWidth + g.glyphGap + leadWidth + g.glyphGap
+        canvas.save()
+        canvas.translate(tailGlyphLeft - g.cx, dy - tailLift)
+        canvas.drawPath(tailPath, symbolHaloPaint)
+        canvas.drawPath(tailPath, glyphPaint)
+        canvas.restore()
+
+        textPaint.textAlign = Paint.Align.LEFT
+        haloPaint.textAlign = Paint.Align.LEFT
+        drawHaloed(canvas, leadText, left + glyphWidth + g.glyphGap, baselineY)
+        drawHaloed(canvas, tailText, tailGlyphLeft + glyphWidth + tailGap, baselineY)
+        textPaint.textAlign = Paint.Align.CENTER
+        haloPaint.textAlign = Paint.Align.CENTER
+    }
+
+
 
     /**
      * Draws a pictogram and its text as one group, centred on the dial. The path is built with its
@@ -536,6 +622,10 @@ class TelemetryLayer {
         epochMillis: Long,
         fahrenheit: Boolean,
         mmHg: Boolean,
+        roverIndex: Int,
+        relayValid: Boolean,
+        owltSeconds: Int,
+        conjunction: Boolean,
     ) {
         val daySeconds = AstroTime.utcSecondOfDay(epochMillis)
 
@@ -554,12 +644,33 @@ class TelemetryLayer {
         }
 
         line1.clear()
+        line1Tail.clear()
         line2.clear()
 
         when (planetMode) {
             PlanetMode.MARS -> {
-                line1.lit(TextBuf.LIT_SOL).uint(AstroTime.marsSol(epochMillis))
-                appendClock(line2.lit(TextBuf.LIT_MTC), AstroTime.marsTimeHours(epochMillis))
+                // The mission sol, not the global MSD: operators plan in the number their rover
+                // counts. When the relay line has nothing to stand on, this row says so — it is
+                // the slot the weather notice would occupy, and the sol returns on recovery,
+                // being pure arithmetic. There is no MTC row: the hour hand *is* the rover's
+                // clock, and a second Mars time under the dial would restate it.
+                if (relayValid) {
+                    line1.lit(TextBuf.LIT_SOL).uint(Rovers.missionSol(epochMillis, roverIndex))
+                    // After the sol, behind an Earth pictogram: the one-way light time — the
+                    // operator's ever-present constant — or the conjunction flag when the sun
+                    // stands between, because a delay for a link that cannot pass is noise and
+                    // the flag is the news.
+                    if (conjunction) {
+                        line1Tail.lit(TextBuf.LIT_CONJ)
+                    } else if (owltSeconds >= 0) {
+                        // mm:ss, the way light time is actually spoken; the dish is what keeps
+                        // it from reading as a time of day.
+                        line1Tail.pad2(owltSeconds / 60).ch(':').pad2(owltSeconds % 60)
+                    }
+                } else {
+                    line1.lit(TextBuf.LIT_NO_EPHEMERIS)
+                }
+                line2.lit(TextBuf.ROVER_NAMES[roverIndex])
             }
 
             PlanetMode.MOON -> {
@@ -644,6 +755,12 @@ class TelemetryLayer {
     }
 
     private companion object {
+        /** The dish-to-figure gap, as a fraction of the ordinary glyph gap: it is a label. */
+        const val DISH_GAP_FRACTION = 0.3f
+
+        /** How far the dish rides above the shared baseline, as a fraction of the radius. */
+        const val DISH_LIFT_FRACTION = 0.010f
+
         /** Halo stroke, as a fraction of the dial radius. */
         const val HALO_WIDTH = 0.014f
 

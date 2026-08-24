@@ -69,6 +69,27 @@ class GeometryBudgetTest {
     }
 
     @Test
+    fun `the mars rows fit the same envelopes`() {
+        // The mars third row at its widest: the mars symbol with a five-digit sol, then the
+        // Earth pictogram with the light time — two glyphs, three gaps, fifteen characters.
+        // `NO EPHEMERIS` behind one glyph is narrower.
+        val noticeHalf = (2 * Geometry.SYMBOL_SIZE + 3 * Geometry.GLYPH_GAP +
+            15 * Geometry.MONO_ADVANCE * Geometry.TEXT_SIZE) / 2f
+        assertInside(
+            "mars notice row",
+            sqrt(
+                (noticeHalf * noticeHalf +
+                    Geometry.LINE_BASELINES[2] * Geometry.LINE_BASELINES[2]).toDouble()
+            ).toFloat(),
+        )
+        // `PERSEVERANCE` — 12 plain characters where Earth draws the site row.
+        assertInside(
+            "rover name row",
+            corner(12, Geometry.TEXT_SIZE, Geometry.LINE_BASELINES[3]),
+        )
+    }
+
+    @Test
     fun `the outlying rows hold their own bargains`() {
         // `BAT 100%` — eight characters at full charge, one more than the 84% the comment quotes.
         assertInside(

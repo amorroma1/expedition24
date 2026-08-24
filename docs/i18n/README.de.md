@@ -46,6 +46,18 @@ METAR-Kürzeln, den nächstgelegenen Flugplatz oder Hafen und das verbleibende T
   Uhr aus, wo die Plattform es zulässt. Keine Begleit-App, kein Konto, keine
   Telemetrie an Dritte.
 
+## MFD-24-Mars
+
+Dasselbe Instrument, einen Planeten weiter: ein eigenes Zifferblatt, das sich **neben** MFD-24
+installiert und die Zeit eines Rovers hält — `PERSEVERANCE` oder `CURIOSITY`. Der Stundenzeiger
+läuft einmal pro Sol (24 h 39 m), das Nadir-Band trägt den Marstag samt Dämmerungsschultern, und
+zwei Linien am Stundenring zeigen die Funkfenster: die Direktverbindung zur Erde innen
+(Himmelsmechanik, offline), die Überflüge der Relais MRO, Odyssey und TGO außen
+(JPL-Horizons-Ephemeriden). Hinter dem Missions-Sol, mit einer Bodenstationsantenne davor: die
+Lichtlaufzeit zur Erde, live.
+
+![](../screenshots/mars.png)
+
 ## Installation
 
 Wear OS 3.0+ (API 30). `app-earth-release.apk` aus dem

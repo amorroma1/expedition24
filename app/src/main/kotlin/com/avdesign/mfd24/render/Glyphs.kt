@@ -52,6 +52,7 @@ object Glyphs {
     private val heart: Path by lazy(LazyThreadSafetyMode.NONE) { heart() }
     private val pedestrian: Path by lazy(LazyThreadSafetyMode.NONE) { pedestrian() }
     private val earthSymbol: Path by lazy(LazyThreadSafetyMode.NONE) { earthSymbol() }
+    private val dish: Path by lazy(LazyThreadSafetyMode.NONE) { dish() }
     private val marsSymbol: Path by lazy(LazyThreadSafetyMode.NONE) { marsSymbol() }
     private val moonSymbol: Path by lazy(LazyThreadSafetyMode.NONE) { moonSymbol() }
 
@@ -74,6 +75,8 @@ object Glyphs {
     fun buildPedestrian(box: RectF, out: Path) = build(pedestrian, box, out)
 
     fun buildEarthSymbol(box: RectF, out: Path) = build(earthSymbol, box, out)
+
+    fun buildDishSymbol(box: RectF, out: Path) = build(dish, box, out)
 
     fun buildMarsSymbol(box: RectF, out: Path) = build(marsSymbol, box, out)
 
@@ -432,6 +435,33 @@ object Glyphs {
         addCircle(50f, 50f, 31f, Path.Direction.CCW)
         addRect(45f, 6f, 55f, 94f, Path.Direction.CW)
         addRect(6f, 45f, 94f, 55f, Path.Direction.CW)
+    }
+
+    /**
+     * A ground-station dish, boresight to the upper right — the label for the light-time
+     * figure, standing where `OWLT` will not fit. A deep bowl read as a crescent at this size,
+     * so the bowl is a fat segment; the feed on its strut is what says "antenna" rather than
+     * "moon", and the pedestal is a plain triangle because legs vanish at 22 px.
+     */
+    private fun dish(): Path = Path().apply {
+        // Bowl: rim chord on the 45-degree diagonal, belly bulging to the lower left.
+        moveTo(14f, 26f)
+        lineTo(74f, 86f)
+        quadTo(6f, 94f, 14f, 26f)
+        close()
+        // Feed strut along the boresight, from the bowl towards the focus.
+        moveTo(42f, 52f)
+        lineTo(60f, 34f)
+        lineTo(66f, 40f)
+        lineTo(48f, 58f)
+        close()
+        // The feed itself.
+        addCircle(66f, 30f, 8f, Path.Direction.CW)
+        // Pedestal.
+        moveTo(34f, 74f)
+        lineTo(56f, 96f)
+        lineTo(12f, 96f)
+        close()
     }
 
     /** Mars ♂ — a ringed circle with an arrow off the upper right. */

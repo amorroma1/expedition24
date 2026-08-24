@@ -101,6 +101,22 @@ class Palette {
         private set
 
     /**
+     * The comm-window lines on the Mars face: the same third-hue computation as the incident
+     * marks, under a name that says what it is for. Green unless the lume is green, then red —
+     * what must be avoided is the arc's hue, not the dial's, and there is no fourth blue-free
+     * hue to spend.
+     */
+    var commWindow: Int = PHOSPHOR_GREEN
+        private set
+
+    /**
+     * The twilight shoulder on the Nadir band: the band's own hue at half its alpha, so dusk
+     * reads as the day fading rather than as a fourth colour the palette does not have.
+     */
+    var twilightBand: Int = 0
+        private set
+
+    /**
      * The solar mark's disc: sun-coloured, whatever the palette wears.
      *
      * A fixed bright amber rather than a palette hue, because the mark stands for the actual sun
@@ -141,10 +157,12 @@ class Palette {
         dutyArc = second
         dutyArcSpent = SPENT_GREY
         daylightBand = withAlpha(lume, NADIR_ALPHA)
+        twilightBand = withAlpha(lume, TWILIGHT_ALPHA)
         // The third hue: the one that is neither the dial's nor the arc's. There are exactly three
         // blue-free hues and the palette spends two, so the remaining one is determined, and the
         // arithmetic is short because the accent is always amber unless the lume is.
         incidentMark = if (lume == PHOSPHOR_GREEN) NVG_RED else PHOSPHOR_GREEN
+        commWindow = incidentMark
         sunMark = SUN_AMBER
         moonMark = MOON_GREY
     }
@@ -166,9 +184,11 @@ class Palette {
         dutyArc = dim(source.dutyArc, AMBIENT_LEVEL)
         dutyArcSpent = dim(source.dutyArcSpent, AMBIENT_LEVEL)
         incidentMark = dim(source.incidentMark, AMBIENT_LEVEL)
+        commWindow = dim(source.commWindow, AMBIENT_LEVEL)
         sunMark = dim(source.sunMark, AMBIENT_LEVEL)
         moonMark = dim(source.moonMark, AMBIENT_LEVEL)
         daylightBand = withAlpha(dim(source.lume, AMBIENT_LEVEL), NADIR_ALPHA)
+        twilightBand = withAlpha(dim(source.lume, AMBIENT_LEVEL), TWILIGHT_ALPHA)
         background = Color.BLACK
         horizon = Color.BLACK
     }
@@ -206,6 +226,9 @@ class Palette {
          * things on the dial.
          */
         const val NADIR_ALPHA: Int = 0x3A
+
+        /** Half the band's weight: dusk is the day fading, not a new element. */
+        private const val TWILIGHT_ALPHA = 0x1E
 
         /** Tactical black backgrounds, one per celestial body. */
         const val BG_EARTH: Int = 0xFF0D0E11.toInt()

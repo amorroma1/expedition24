@@ -21,6 +21,10 @@ package com.avdesign.mfd24.render
  * zero for almost every zone on earth and half a turn for the half-hour ones. Seconds are never
  * affected: no zone offset has ever had a fractional minute in it.
  *
+ * The day is a parameter, not a constant: on Mars the frame of reference is the selected rover's
+ * meridian and the moduli are the sol and the Mars hour, so a rover switch glides exactly the
+ * way a zone change does — same machinery, same feel, nothing new to learn on either world.
+ *
  * Holds only primitives and allocates nothing.
  */
 class DialTransition {
@@ -69,6 +73,7 @@ class DialTransition {
         targetOffsetMillis: Long,
         targetDaylightStart: Float,
         targetDaylightSweep: Float,
+        dayMillis: Long = DAY_MILLIS,
     ) {
         if (!initialised) {
             initialised = true
@@ -94,12 +99,13 @@ class DialTransition {
             // gratuitous turn. The landing value differs from the real offset by a multiple of a
             // day, which every angle here is taken modulo anyway.
             hourFrom = hourOffsetMillis
-            hourTo = hourFrom + shortestDelta(hourFrom, targetOffsetMillis, DAY_MILLIS)
+            hourTo = hourFrom + shortestDelta(hourFrom, targetOffsetMillis, dayMillis)
 
-            // The minute hand goes the short way round an hour: nothing at all for a whole-hour
-            // zone, half a turn for a half-hour one.
+            // The minute hand goes the short way round an hour — this world's own hour, a
+            // twenty-fourth of its day: nothing at all for a whole-hour change, and a rover
+            // switch of almost exactly four Mars hours moves it by seconds.
             minuteFrom = minuteOffsetMillis
-            minuteTo = minuteFrom + shortestDelta(minuteFrom, targetOffsetMillis, HOUR_MILLIS)
+            minuteTo = minuteFrom + shortestDelta(minuteFrom, targetOffsetMillis, dayMillis / 24L)
 
             sweepFrom = daylightSweep
             sweepTo = targetDaylightSweep
@@ -158,6 +164,5 @@ class DialTransition {
         const val DURATION_MILLIS = 4000L
 
         const val DAY_MILLIS = 86_400_000L
-        const val HOUR_MILLIS = 3_600_000L
     }
 }

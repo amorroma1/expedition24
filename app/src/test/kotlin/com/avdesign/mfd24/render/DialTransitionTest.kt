@@ -3,6 +3,7 @@
 
 package com.avdesign.mfd24.render
 
+import com.avdesign.mfd24.astro.AstroTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -131,5 +132,33 @@ class DialTransitionTest {
         transition.update(t0 + 10_000L, 3 * hour, 0f, 0f)
         assertTrue(!transition.animating)
         assertEquals(3 * hour, transition.hourOffsetMillis)
+    }
+
+    /**
+     * The Mars case: a rover switch is a change of meridian, eased with the sol as the day and
+     * a Mars hour as the hour. Jezero to Gale is 59.9909 degrees — four Mars hours less about a
+     * second and a half — so the sol scale must take the whole change once, and the minute hand
+     * only the remainder, not four full turns.
+     */
+    @Test
+    fun `a rover switch glides the sol scale whole and the minute hand by seconds`() {
+        val sol = Math.round(AstroTime.SOL_IN_MILLIS)
+        val perseverance = Math.round(77.4508 / 360.0 * AstroTime.SOL_IN_MILLIS)
+        val curiosity = Math.round(137.4417 / 360.0 * AstroTime.SOL_IN_MILLIS)
+        val transition = DialTransition().apply { update(t0, perseverance, 0f, 0f, sol) }
+        var hourPrevious = transition.hourOffsetMillis
+        var minutePrevious = transition.minuteOffsetMillis
+        var hourTravelled = 0L
+        var minuteTravelled = 0L
+        for (step in 1..200) {
+            transition.update(t0 + step * 25L, curiosity, 0f, 0f, sol)
+            hourTravelled += abs(transition.hourOffsetMillis - hourPrevious)
+            minuteTravelled += abs(transition.minuteOffsetMillis - minutePrevious)
+            hourPrevious = transition.hourOffsetMillis
+            minutePrevious = transition.minuteOffsetMillis
+        }
+        assertEquals(curiosity - perseverance, hourTravelled)
+        assertEquals(curiosity, transition.hourOffsetMillis)
+        assertTrue("minute hand travelled $minuteTravelled ms", minuteTravelled < 5_000L)
     }
 }

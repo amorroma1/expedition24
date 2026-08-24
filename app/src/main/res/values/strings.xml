@@ -6,6 +6,31 @@
 
     <!-- Planet mode -->
 
+    <!-- Rover and relay satellites: referenced only by the mars flavor's schema and editor,
+         carried in main because shared code names them. -->
+    <string name="style_rover_name">Rover</string>
+    <string name="style_rover_desc">Whose site and sol the dial keeps</string>
+    <string name="rover_perseverance">PERSEVERANCE</string>
+    <string name="rover_perseverance_sr">Perseverance, Jezero crater</string>
+    <string name="rover_curiosity">CURIOSITY</string>
+    <string name="rover_curiosity_sr">Curiosity, Gale crater</string>
+    <string name="style_relay_mro_name">MRO relay</string>
+    <string name="style_relay_odyssey_name">Odyssey relay</string>
+    <string name="style_relay_maven_name">MAVEN relay</string>
+    <string name="style_relay_tgo_name">TGO relay</string>
+    <string name="style_relay_desc">Counted into the relay window line</string>
+    <string name="relay_off">OFF</string>
+    <string name="relay_off_sr">Excluded from the relay windows</string>
+    <string name="relay_on">ON</string>
+    <string name="relay_on_sr">Included in the relay windows</string>
+    <string name="editor_section_rover">ROVER</string>
+    <string name="editor_label_mro">MRO</string>
+    <string name="editor_label_odyssey">ODYSSEY</string>
+    <string name="editor_label_maven">MAVEN</string>
+    <string name="editor_label_tgo">TGO</string>
+    <string name="editor_rover_rationale">The dial, the daylight and the comm windows all follow the selected rover: its site, its sol.</string>
+    <string name="editor_relays_rationale">The outer line shows every enabled orbiter passing over the rover, from downloaded ephemerides.</string>
+
     <!-- Lume palette -->
     <string name="style_palette_name">Lume palette</string>
     <string name="style_palette_desc">Colour of the dial markings</string>

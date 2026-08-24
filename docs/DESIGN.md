@@ -758,6 +758,60 @@ at a readable size, which is where release notes have always belonged. `RELEASE 
 whole thing off, and a stored finding is re-tested against the build that reads it — without that,
 a watch updated by hand went on advertising the version it had just replaced.
 
+### The Mars face (MFD-24-Mars)
+
+A second product flavor on the same tree — `com.avdesign.mfd24.mars`, its own app beside the
+Earth one — that fixes the render path's `PlanetMode` to Mars and gives every Earth-only
+mechanism a Martian answer.
+
+**The dial runs the selected rover's mean solar time.** `astro/MarsSolarTime` implements the
+Allison & McEwen (2000) chain — the Mars24 algorithm: mean anomaly, the seven-term perturbation
+series, equation of centre, Ls, and an equation of time that Mars's eccentricity swings through
+±50 minutes. The rover (`PERSEVERANCE` or `CURIOSITY`, coordinates compile-time constants) sets
+the meridian; its longitude, expressed in Mars milliseconds, is the dial's frame-of-reference
+offset, eased by the same `DialTransition` that carries an Earth zone change — so a rover switch
+glides the hands, the duty arc, the daylight and both comm lines together, the short way round
+the sol, with the minute hand taking only the sub-hour remainder. The readout's `SOL` is the
+mission sol, counted from each rover's own landing.
+
+**The daylight band is drawn per frame from its instants** through the eased offset, like the
+duty arc — on a rover switch the offset and the band's instants move by nearly opposite amounts,
+and the Earth-style angle easing left the band parked while the dial travelled past it. The band
+carries −6° twilight shoulders at half its alpha. **There is no sun mark on Mars**, and the
+absence is the design: on a mean-time dial the only sun that touches the band's edges at the
+physical sunrise and sunset is the hour hand itself — a dot there restates the hand, which is
+the ornament the Earth face once killed — while the true sun's hour angle hangs up to ±50
+minutes (Mars's equation of time) clear of its own band at the horizons, reading as a defect.
+And the compass claim the Earth mark earns its keep by is empty on Mars: nobody on this side of
+the link can point the dial at that sun. The hand, the band and the shoulders carry it all.
+
+**Two comm lines hug the hour-tick ring**, both in the palette's third hue (the incident marks'
+own rule), separating by radius because a fourth blue-free hue does not exist. The **inner**
+line is the direct-to-Earth window: Earth above 10° at the rover, computed offline
+(`astro/EarthSky`, Standish elements, the Mars—Earth vector rotated into the IAU Mars frame,
+hour angle anchored through the sun so frame zero-point errors cancel). The **outer** line is
+the relay passes — MRO, Odyssey, TGO, each toggleable — from JPL Horizons observer tables
+fetched six-hourly, cached per rover and per satellite in device-protected storage. Validity is
+per instant, not per fetch: the union is drawn only while every enabled satellite's table
+reaches past now, and otherwise the readout says `NO EPHEMERIS` in the weather row's slot.
+MAVEN's published trajectory ended in March 2026; "no ephemeris for target" is its own parse
+answer, contributing honest emptiness rather than blocking the line. Two platform facts paid for
+on first contact: Horizons wants Mars site longitude west-positive with planetographic latitude,
+and JPL's certificate chains to Sectigo Root R46, newer than the API 30 trust store — the mars
+flavor carries that public root as a trust anchor scoped to `ssd.jpl.nasa.gov` alone.
+
+**The third row is the link itself**: `SOL 4994`, then a ground-station dish labelling the
+one-way light time to Earth, `15:42`, in real (SI) minutes and seconds — light time is a
+propagation delay and owes nothing to any planet's rotation; only the local clock stretches.
+Under a two-degree Sun–Earth separation the figure yields to `CONJ` and the DTE line thins to a
+hairline — the duty arc's uncovered-width idiom: a line that says what can actually pass.
+
+**What the flavor removes** it removes whole: weather, the site lock and the POI index (absent
+from the APK, and CI asserts the absence), the lunar mark, the unit rows. The duty arc moves off
+the crowded tick belt to 0.605 r, between the hour hand's tip and the numerals, so the hand
+points onto its own rail. Everything else — vigilance, the incident record, the export — is the
+same instrument in the rover's time.
+
 ---
 
 ## Settings

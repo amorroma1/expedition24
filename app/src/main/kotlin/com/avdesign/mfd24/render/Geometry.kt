@@ -15,7 +15,16 @@ import kotlin.math.sin
  * [rebuild] is the only place in the drawing path that allocates, and it runs only when the surface
  * bounds actually change. Everything the per-frame code touches is a preallocated array or path.
  */
-class Geometry {
+class Geometry(
+    /**
+     * Where the duty arc rides, as a fraction of the radius — a per-world choice made at
+     * construction. Earth keeps [DUTY_ARC_RADIUS], just inside the hour ticks; Mars moves the
+     * arc to [DUTY_ARC_RADIUS_MARS], between the hour hand's tip and the numerals, because the
+     * tick ring there already carries the two comm lines and the Nadir band, and three data
+     * rings plus the arc in one belt read as clutter.
+     */
+    private val dutyArcRadiusFraction: Float = DUTY_ARC_RADIUS,
+) {
 
     var width: Int = 0
         private set
@@ -87,6 +96,17 @@ class Geometry {
     var daylightWidth: Float = 0f
         private set
 
+    // --- Comm windows (Mars) ------------------------------------------------------------------
+
+    /** Inner comm line: the rover's direct-to-Earth windows, just inside the hour ticks. */
+    val commInnerTrack: RectF = RectF()
+
+    /** Outer comm line: relay passes, in the clear band between cardinal tips and minute ring. */
+    val commOuterTrack: RectF = RectF()
+
+    var commStrokeWidth: Float = 0f
+        private set
+
     // --- Hands -----------------------------------------------------------------------------
 
     /**
@@ -108,7 +128,7 @@ class Geometry {
 
     /** Centre-line of the duty arc, where its incident marks have to cross it. */
     val dutyArcRadius: Float
-        get() = r * DUTY_ARC_RADIUS
+        get() = r * dutyArcRadiusFraction
 
     /** Hollow outlines used in ambient mode, where filled hands would burn the panel. */
     val hourHandOutline: Path = Path()
@@ -196,9 +216,12 @@ class Geometry {
         ringWidth = r * 0.008f
 
         setRadius(outerRing, RING_RADIUS)
-        setRadius(dutyArcTrack, DUTY_ARC_RADIUS)
+        setRadius(dutyArcTrack, dutyArcRadiusFraction)
         setRadius(daylightTrack, (TICK_HOUR_INNER + TICK_CARDINAL_OUTER) / 2f)
         daylightWidth = r * (TICK_CARDINAL_OUTER - TICK_HOUR_INNER)
+        setRadius(commInnerTrack, COMM_INNER_RADIUS)
+        setRadius(commOuterTrack, COMM_OUTER_RADIUS)
+        commStrokeWidth = r * COMM_STROKE
         secondsMarkerBaseRadius = r * SECONDS_MARKER_BASE
         // Pitch between two minute ticks, measured along the arc the cursor's base sits on.
         val pitch = 2.0 * Math.PI * secondsMarkerBaseRadius / MINUTE_TICKS
@@ -422,7 +445,7 @@ class Geometry {
         private const val RING_RADIUS = 0.985f
 
         /** Outer band: the 60-division minute and seconds scale. */
-        private const val TICK_MINUTE_INNER = 0.930f
+        const val TICK_MINUTE_INNER = 0.930f
         private const val TICK_MINUTE_OUTER = 0.970f
 
         /**
@@ -430,14 +453,35 @@ class Geometry {
          * they get their own tracks rather than fighting for the same one; the hour ticks stop
          * short of the minute ring so the gap between them reads as deliberate.
          */
-        private const val TICK_HOUR_INNER = 0.785f
+        const val TICK_HOUR_INNER = 0.785f
         private const val TICK_HOUR_OUTER = 0.870f
-        private const val TICK_CARDINAL_OUTER = 0.905f
+        const val TICK_CARDINAL_OUTER = 0.905f
 
         private const val LABEL_RADIUS = 0.680f
 
         /** The duty arc rides on the inner circle the hour ticks spring from. */
         const val DUTY_ARC_RADIUS = 0.760f
+
+        /**
+         * The Mars face's duty arc: between the hour hand's tip (0.620 r) and the hour numerals
+         * (inner edge 0.632 r), so the hand points onto its own rail. The clearances are held by
+         * a test: the band's outer edge (0.605 + 0.028/2 = 0.619 r) stays under the numerals,
+         * and its inner edge (0.591 r) clears the readout's worst corner (~0.57 r).
+         */
+        const val DUTY_ARC_RADIUS_MARS = 0.605f
+
+        /**
+         * The comm lines hug the hour-tick ring, one on each edge, separating by radius because
+         * a fourth blue-free hue does not exist. The collision arithmetic, held by
+         * CommTrackTest: the inner band spans 0.776–0.785 r — its outer edge lands exactly on
+         * [TICK_HOUR_INNER], the circle the ticks spring from, and its inner edge clears the
+         * duty arc's outer edge (0.760 + 0.028/2 = 0.774 r); the outer band spans
+         * 0.9105–0.9195 r, clear of both the cardinal tips ([TICK_CARDINAL_OUTER]) and the
+         * minute ring ([TICK_MINUTE_INNER]).
+         */
+        const val COMM_INNER_RADIUS = 0.7805f
+        const val COMM_OUTER_RADIUS = 0.915f
+        const val COMM_STROKE = 0.009f
 
         /**
          * The readout is bare type on the dial — no window, no frame — split either side of the

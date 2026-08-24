@@ -17,17 +17,23 @@ import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.style.CurrentUserStyleRepository
 import androidx.wear.watchface.style.UserStyle
 import com.avdesign.mfd24.astro.AstroTime
+import com.avdesign.mfd24.astro.DteWindows
+import com.avdesign.mfd24.astro.EarthSky
+import com.avdesign.mfd24.astro.MarsSolarTime
 import com.avdesign.mfd24.astro.MoonSky
 import com.avdesign.mfd24.astro.MoonState
 import com.avdesign.mfd24.astro.PlanetMode
+import com.avdesign.mfd24.astro.Rovers
 import com.avdesign.mfd24.astro.SolarTime
 import com.avdesign.mfd24.data.Alerts
+import com.avdesign.mfd24.data.MarsCommState
 import com.avdesign.mfd24.data.TelemetryState
 import com.avdesign.mfd24.data.SensorSlots
 import com.avdesign.mfd24.data.VigilanceState
 import com.avdesign.mfd24.data.VigilanceStore
 import com.avdesign.mfd24.data.WatchShiftState
 import com.avdesign.mfd24.render.AmbientAuto
+import com.avdesign.mfd24.render.CommWindowLayer
 import com.avdesign.mfd24.render.AmbientLayer
 import com.avdesign.mfd24.render.DaylightLayer
 import com.avdesign.mfd24.render.DialLayer
@@ -87,6 +93,12 @@ class MfdRenderer(
     private val onVigilanceRequest: (Boolean, Long, Int, Int, Boolean, Long, Long) -> Unit,
     /** Which reading each slot beside the hub wants, as SensorSlots.Kind ordinals. */
     private val onSensorSlots: (Int, Int) -> Unit,
+    /** The Mars comm windows, or null on any world that has none. */
+    private val marsComm: MarsCommState? = null,
+    /** Fired only when the selected rover changes, like every callback out of applyStyle. */
+    private val onRoverSelected: (Int) -> Unit = { },
+    /** Fired only when the enabled-relay bitmask changes. */
+    private val onRelayMask: (Int) -> Unit = { },
     /** Resolved strings for the spoken labels — a Renderer has no Context to resolve its own. */
     private val descriptions: FaceDescriptions,
 ) : Renderer.CanvasRenderer2<MfdRenderer.Assets>(
@@ -103,7 +115,13 @@ class MfdRenderer(
         override fun onDestroy() = Unit
     }
 
-    private val geometry = Geometry()
+    private val geometry = Geometry(
+        if (PlanetMode.fromOptionId(BuildConfig.WORLD) == PlanetMode.MARS) {
+            Geometry.DUTY_ARC_RADIUS_MARS
+        } else {
+            Geometry.DUTY_ARC_RADIUS
+        }
+    )
     private val palette = Palette()
 
     /**
@@ -119,6 +137,7 @@ class MfdRenderer(
     private val handsLayer = HandsLayer()
     private val secondsMarker = SecondsMarker()
     private val dutyArcLayer = DutyArcLayer()
+    private val commWindowLayer = CommWindowLayer()
     private val telemetryLayer = TelemetryLayer()
     private val ambientLayer = AmbientLayer()
 
@@ -126,11 +145,12 @@ class MfdRenderer(
     private val burnInProtection = watchState.hasBurnInProtection
 
     /**
-     * The body the hour hand keeps time on. Fixed: this face is Earth's, so the value is read
-     * from nothing and never written. The engine underneath still takes it as a parameter — the
-     * arithmetic is general and tested that way — which is why this is a field and not inlined.
+     * The body the hour hand keeps time on. Fixed per flavor: a build is one world's instrument,
+     * so the value comes from `BuildConfig.WORLD` and is never written at runtime. The engine
+     * underneath still takes it as a parameter — the arithmetic is general and tested that way —
+     * which is why this is a field and not inlined.
      */
-    private val planetMode: Int = PlanetMode.EARTH
+    private val planetMode: Int = PlanetMode.fromOptionId(BuildConfig.WORLD)
 
     @Volatile
     private var fahrenheit: Boolean = false
@@ -147,6 +167,61 @@ class MfdRenderer(
     @Volatile
     private var nadirEnabled: Boolean = false
 
+    /**
+     * Which rover's meridian the Mars dial runs on. Read per frame by [planetHoursAt], written
+     * only from the style; meaningless — and untouched — on any other world.
+     */
+    @Volatile
+    private var roverIndex: Int = Rovers.PERSEVERANCE
+
+    /**
+     * Enabled relay satellites, a bitmask in [StyleSchema.RELAY_SETTINGS] order. Held here so a
+     * style change can reach the ephemeris side the same way the weather switch reaches the
+     * telemetry side; the renderer itself never reads it.
+     */
+    @Volatile
+    private var relayMask: Int = 0xF
+
+    /**
+     * Whether the relay windows on file reach past now, mirrored from [marsComm] each frame.
+     * False until the ephemeris side first publishes — which is also the honest reading: a face
+     * that has never loaded ephemerides says NO EPHEMERIS rather than showing an empty line
+     * that could mean "no passes today". Render-thread only.
+     */
+    private var relayWindowsValid: Boolean = false
+
+    // The daylight band as drawn this frame: the transition's eased angles on Earth, a
+    // per-frame mapping of the sol's instants on Mars. Render-thread only.
+    private var daylightDrawStart = 0f
+    private var daylightDrawSweep = 0f
+
+    // The twilight shoulders either side of the Mars band, mapped per frame like the band
+    // itself; zero sweeps on any other world. Render-thread only.
+    private var twilightMorningStart = 0f
+    private var twilightMorningSweep = 0f
+    private var twilightEveningStart = 0f
+    private var twilightEveningSweep = 0f
+
+    /** One-way light time to Earth this frame, seconds; −1 where the row has no such thing. */
+    private var owltSeconds = -1
+
+    /** Solar conjunction: the DTE line thins to a hairline and the readout flies the flag. */
+    private var dteBlocked = false
+
+    // Comm windows: instants copied when the state's version moves, angles refilled per frame
+    // like the duty arc's. All preallocated — render() allocates nothing.
+    private var marsCommVersionSeen = -1
+    private var marsDteCount = 0
+    private var marsRelayCount = 0
+    private val marsDteStart = LongArray(DteWindows.MAX)
+    private val marsDteEnd = LongArray(DteWindows.MAX)
+    private val marsRelayStart = LongArray(MarsCommState.MAX_RELAY_WINDOWS)
+    private val marsRelayEnd = LongArray(MarsCommState.MAX_RELAY_WINDOWS)
+    private val commDteAngles = FloatArray(DteWindows.MAX * 2)
+    private val commRelayAngles = FloatArray(MarsCommState.MAX_RELAY_WINDOWS * 2)
+    private var commDteArcCount = 0
+    private var commRelayArcCount = 0
+
     @Volatile
     private var solarMarkEnabled: Boolean = false
 
@@ -157,10 +232,12 @@ class MfdRenderer(
     private val moonState = MoonState()
 
     /**
-     * Whether the readout leads its weather row with a reference-frame symbol. It does not: with
-     * one world on offer the glyph said nothing, so the row starts at its own text.
+     * Whether the readout leads its third row with a reference-frame symbol. On Earth it does
+     * not — with one world on offer the glyph said nothing — but a face that keeps another
+     * world's time wears its symbol, because the one thing the reader must never mistake is
+     * which clock they are looking at.
      */
-    private val frameSymbol = false
+    private val frameSymbol = planetMode != PlanetMode.EARTH
 
     /** One of [AmbientAuto]'s modes; AUTO resolves per frame against daylight and the duty. */
     @Volatile
@@ -260,9 +337,12 @@ class MfdRenderer(
             style, StyleSchema.LUNAR_MARK, StyleSchema.LUNAR_OFF
         ) == StyleSchema.LUNAR_ON
         // The weather switch reaches the repository as well as the renderer: off means nothing is
-        // fetched, not merely that the row is blank.
+        // fetched, not merely that the row is blank. Gated on the world as well as the style,
+        // because the Mars schema carries no weather setting and the fallback here is ON — left
+        // unguarded, the Mars face would quietly fetch Earth weather it can never show.
         onWeatherEnabled(
-            StyleSchema.optionId(style, StyleSchema.WEATHER, StyleSchema.WEATHER_ON) ==
+            planetMode == PlanetMode.EARTH &&
+                StyleSchema.optionId(style, StyleSchema.WEATHER, StyleSchema.WEATHER_ON) ==
                 StyleSchema.WEATHER_ON
         )
         vigilanceEnabled = StyleSchema.optionId(
@@ -288,6 +368,18 @@ class MfdRenderer(
         logHeartRate = StyleSchema.optionId(
             style, StyleSchema.LOG_HEART_RATE, StyleSchema.LOG_HR_OFF
         ) == StyleSchema.LOG_HR_ON
+        val newRover = Rovers.fromOptionId(
+            StyleSchema.optionId(style, StyleSchema.ROVER, Rovers.ID_PERSEVERANCE)
+        )
+        if (newRover != roverIndex) {
+            roverIndex = newRover
+            onRoverSelected(newRover)
+        }
+        val newRelayMask = StyleSchema.relayMask(style)
+        if (newRelayMask != relayMask) {
+            relayMask = newRelayMask
+            onRelayMask(newRelayMask)
+        }
         palette.update(paletteId, planetMode)
         // Always-on is the same palette, dimmed. Nothing to cross-fade on waking.
         ambientPalette.updateAmbientFrom(palette)
@@ -315,9 +407,28 @@ class MfdRenderer(
 
         val mode = planetMode
 
-        // Where the daylight band wants to be, before easing. Earth only: on Mars or the Moon the
-        // hour scale runs on that world's own clock, so shading it with an Earth sunrise would
-        // place the band at meaningless hours.
+        // One full turn of the hour hand on this world; the daylight band and the duty arc both
+        // sweep against it.
+        val period = planetPeriodMillis(mode)
+
+        // The dial's frame-of-reference offset: the time zone on Earth, the selected rover's
+        // meridian on Mars, expressed in that world's own milliseconds. One number, so that a
+        // zone change and a rover switch are the same event to the transition — everything on
+        // the hour scale glides together, the way the brief's Earth face already re-sets.
+        val frameOffsetMillis = when (mode) {
+            PlanetMode.MARS ->
+                Math.round(Rovers.LON_EAST[roverIndex] / 360.0 * AstroTime.SOL_IN_MILLIS)
+            PlanetMode.MOON -> 0L
+            else -> realOffsetMillis
+        }
+
+        // Where the daylight band wants to be, before easing — Earth only. On Earth the band's
+        // instants stay put while positions and zones move it, so easing its *angles* is what
+        // makes a change of position morph the band in place. On Mars the band is drawn per
+        // frame from its instants through the eased offset instead (below, beside the duty
+        // arc), because a rover switch moves the offset and the instants by nearly opposite
+        // amounts: angle-eased, the band sat parked while the whole dial travelled past it,
+        // which read as broken. The Moon has no band at all — a lunar day is a synodic month.
         var targetDaylightStart = 0f
         var targetDaylightSweep = 0f
         if (nadirEnabled && mode == PlanetMode.EARTH && telemetry.daylightValid) {
@@ -326,10 +437,10 @@ class MfdRenderer(
                 SolarTime.POLAR_NIGHT -> targetDaylightSweep = 0f
                 else -> {
                     targetDaylightStart = AstroTime.hourHandAngle(
-                        planetHoursAt(telemetry.sunriseMillis, mode, realOffsetMillis), flipped
+                        planetHoursAt(telemetry.sunriseMillis, mode, frameOffsetMillis), flipped
                     )
                     targetDaylightSweep = sweepFor(
-                        telemetry.sunsetMillis - telemetry.sunriseMillis, AstroTime.MILLIS_PER_DAY
+                        telemetry.sunsetMillis - telemetry.sunriseMillis, period
                     )
                 }
             }
@@ -339,8 +450,70 @@ class MfdRenderer(
         // once. Easing the offset carries the hour hand, both ends of the duty arc and the
         // daylight band together, so the dial re-sets itself the way a good chronograph does
         // instead of teleporting.
-        transition.update(epochMillis, realOffsetMillis, targetDaylightStart, targetDaylightSweep)
+        transition.update(
+            epochMillis, frameOffsetMillis, targetDaylightStart, targetDaylightSweep,
+            Math.round(period),
+        )
         val utcOffsetMillis = transition.hourOffsetMillis
+
+        // What the band actually draws this frame. Earth reads the transition's eased angles;
+        // Mars maps the sol's own instants through the eased offset, exactly as the duty arc
+        // and the comm windows do, so a rover switch carries the band around with the dial.
+        daylightDrawStart = transition.daylightStart
+        daylightDrawSweep = transition.daylightSweep
+        twilightMorningSweep = 0f
+        twilightEveningSweep = 0f
+        if (mode == PlanetMode.MARS) {
+            daylightDrawStart = 0f
+            daylightDrawSweep = 0f
+            if (nadirEnabled && telemetry.daylightValid) {
+                when (telemetry.daylightKind) {
+                    SolarTime.POLAR_DAY -> daylightDrawSweep = 360f
+                    SolarTime.POLAR_NIGHT -> daylightDrawSweep = 0f
+                    else -> {
+                        daylightDrawStart = AstroTime.hourHandAngle(
+                            planetHoursAt(telemetry.sunriseMillis, mode, utcOffsetMillis), flipped
+                        )
+                        daylightDrawSweep = sweepFor(
+                            telemetry.sunsetMillis - telemetry.sunriseMillis, period
+                        )
+                        // The twilight shoulders: −6° to the horizon on each side, in the
+                        // band's own hue at half weight, mapped through the same eased offset
+                        // so they ride with everything else.
+                        val comm = marsComm
+                        if (comm != null) {
+                            val dawnFrom = comm.twilightStartMillis
+                            val duskUntil = comm.twilightEndMillis
+                            if (dawnFrom in 1 until telemetry.sunriseMillis) {
+                                twilightMorningStart = AstroTime.hourHandAngle(
+                                    planetHoursAt(dawnFrom, mode, utcOffsetMillis), flipped
+                                )
+                                twilightMorningSweep =
+                                    sweepFor(telemetry.sunriseMillis - dawnFrom, period)
+                            }
+                            if (duskUntil > telemetry.sunsetMillis) {
+                                twilightEveningStart = AstroTime.hourHandAngle(
+                                    planetHoursAt(telemetry.sunsetMillis, mode, utcOffsetMillis),
+                                    flipped,
+                                )
+                                twilightEveningSweep =
+                                    sweepFor(duskUntil - telemetry.sunsetMillis, period)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // The link telemetry: light time to Earth and the conjunction flag. Scalar astronomy in
+        // the frame loop, by the moon model's own precedent; nothing here allocates.
+        owltSeconds = -1
+        dteBlocked = false
+        if (mode == PlanetMode.MARS) {
+            val linkNow = System.currentTimeMillis()
+            owltSeconds = EarthSky.oneWayLightSeconds(linkNow).toInt()
+            dteBlocked = EarthSky.sunEarthAngleDeg(linkNow) < EarthSky.CONJUNCTION_DEG
+        }
 
         // Full rate while the dial is gliding, and while the face is sweeping out of always-on.
         // See [IDLE_FRAME_PERIOD_MS].
@@ -382,7 +555,6 @@ class MfdRenderer(
         // makes an eight-hour Earth shift about four degrees of dial. Arithmetically right and
         // impossible to read, so the arc is dropped there and the duty readout carries the shift
         // on its own.
-        val period = planetPeriodMillis(mode)
         val showDutyArc = dutyState != WatchShiftState.DUTY_OFF && mode != PlanetMode.MOON &&
             // A booked shift keeps its arc off the dial until it is within a turn of it. Past that
             // the arc says something false — see WatchShiftState.pendingArcVisible.
@@ -496,6 +668,41 @@ class MfdRenderer(
             else -> 0f
         }
 
+        // The comm windows, instants to angles through the same mapping as everything else on
+        // the hour scale. Copied out of the shared state only when its version moves; re-angled
+        // every frame so a zone glide or a dial flip carries them with the dial.
+        commDteArcCount = 0
+        commRelayArcCount = 0
+        if (mode == PlanetMode.MARS && marsComm != null) {
+            if (marsCommVersionSeen != marsComm.version) {
+                marsDteCount = marsComm.copyDte(marsDteStart, marsDteEnd)
+                marsRelayCount = marsComm.copyRelay(marsRelayStart, marsRelayEnd)
+                marsCommVersionSeen = marsComm.version
+            }
+            relayWindowsValid = marsComm.relayValid
+            var w = 0
+            while (w < marsDteCount) {
+                commDteAngles[2 * w] = AstroTime.hourHandAngle(
+                    planetHoursAt(marsDteStart[w], mode, utcOffsetMillis), flipped
+                )
+                commDteAngles[2 * w + 1] = sweepFor(marsDteEnd[w] - marsDteStart[w], period)
+                w++
+            }
+            commDteArcCount = marsDteCount
+            if (relayWindowsValid) {
+                w = 0
+                while (w < marsRelayCount) {
+                    commRelayAngles[2 * w] = AstroTime.hourHandAngle(
+                        planetHoursAt(marsRelayStart[w], mode, utcOffsetMillis), flipped
+                    )
+                    commRelayAngles[2 * w + 1] =
+                        sweepFor(marsRelayEnd[w] - marsRelayStart[w], period)
+                    w++
+                }
+                commRelayArcCount = marsRelayCount
+            }
+        }
+
         // The sky marks sit at their bodies' hour angles — apparent solar time for the sun, the
         // truncated Meeus series for the moon — mapped straight onto the 24-hour scale. Hour
         // angle, not clock time: the first sun mark rode the band as a fraction of the daylight,
@@ -508,6 +715,13 @@ class MfdRenderer(
         // reading, it is no reading.
         var sunTrueAngle = Float.NaN
         var sunUp = false
+        // Earth only, and on Mars deliberately absent rather than unimplemented: on a mean-time
+        // dial the only sun that touches the band's edges at the physical sunrise and sunset is
+        // the hour hand itself — a dot there restates the hand, and the true sun's hour angle
+        // hangs up to ±50 minutes clear of its own band at the horizons (Mars's equation of
+        // time), which reads as a defect, not a datum. Nobody on this side of the link can
+        // point the dial at the sun being marked, so the compass claim the Earth mark earns
+        // its keep by is empty there. The hand, the band and the twilight shoulders carry it.
         val marksWanted = nadirEnabled && mode == PlanetMode.EARTH &&
             telemetry.daylightValid && telemetry.daylightKind == SolarTime.NORMAL
         if (marksWanted && telemetry.sunsetMillis > telemetry.sunriseMillis) {
@@ -522,10 +736,12 @@ class MfdRenderer(
         val sunAngle = if (solarMarkEnabled && sunUp) sunTrueAngle else Float.NaN
 
         // The moon needs an observer, and its lit side needs the sun's direction even at night —
-        // which is why sunTrueAngle is computed above regardless of the solar setting.
+        // which is why sunTrueAngle is computed above regardless of the solar setting. Earth
+        // only: MoonSky is Earth's own moon from an Earth observer, and Mars has no lunar mark
+        // by design.
         var moonAngle = Float.NaN
         var moonFraction = 0f
-        if (lunarMarkEnabled && marksWanted && !sunTrueAngle.isNaN() &&
+        if (lunarMarkEnabled && mode == PlanetMode.EARTH && marksWanted && !sunTrueAngle.isNaN() &&
             !telemetry.positionLatDeg.isNaN()
         ) {
             MoonSky.compute(
@@ -671,9 +887,19 @@ class MfdRenderer(
             // wants it in a different palette and renders once a minute, so a second pair of
             // 454 x 454 bitmaps would cost memory to save time that is not scarce.
             canvas.drawColor(Color.BLACK)
+            if (twilightMorningSweep > 0f) {
+                daylightLayer.draw(
+                    canvas, geometry, p.twilightBand, twilightMorningStart, twilightMorningSweep,
+                )
+            }
+            if (twilightEveningSweep > 0f) {
+                daylightLayer.draw(
+                    canvas, geometry, p.twilightBand, twilightEveningStart, twilightEveningSweep,
+                )
+            }
             daylightLayer.draw(
                 canvas, geometry, p.daylightBand,
-                transition.daylightStart, transition.daylightSweep,
+                daylightDrawStart, daylightDrawSweep,
             )
             if (!sunAngle.isNaN()) {
                 daylightLayer.drawSun(canvas, geometry, p.sunMark, p.background, sunAngle)
@@ -690,9 +916,19 @@ class MfdRenderer(
             // between the two blits recycled a bitmap the frame was still going to draw.
             dialLayer.prepare(geometry, palette, styleGeneration, midnightAs24)
             canvas.drawBitmap(dialLayer.background(), 0f, 0f, null)
+            if (twilightMorningSweep > 0f) {
+                daylightLayer.draw(
+                    canvas, geometry, p.twilightBand, twilightMorningStart, twilightMorningSweep,
+                )
+            }
+            if (twilightEveningSweep > 0f) {
+                daylightLayer.draw(
+                    canvas, geometry, p.twilightBand, twilightEveningStart, twilightEveningSweep,
+                )
+            }
             daylightLayer.draw(
                 canvas, geometry, p.daylightBand,
-                transition.daylightStart, transition.daylightSweep,
+                daylightDrawStart, daylightDrawSweep,
             )
             if (!sunAngle.isNaN()) {
                 daylightLayer.drawSun(canvas, geometry, p.sunMark, p.background, sunAngle)
@@ -723,13 +959,35 @@ class MfdRenderer(
             )
         }
 
+        // The comm lines ride the tick ring's edges, in both draw modes — the windows are what
+        // this instrument is for, and ambient is exactly when a wrist gets glanced at. Counts
+        // are zero on any world but Mars, so the calls cost nothing elsewhere.
+        if (commDteArcCount > 0 || commRelayArcCount > 0) {
+            // In conjunction the geometry still holds — Earth is above the horizon — but the
+            // corona is in the way, so the DTE line thins to a hairline: the same idiom as the
+            // duty arc's uncovered width, a line that says what can actually pass.
+            val dteStroke = if (dteBlocked) {
+                geometry.commStrokeWidth * CONJUNCTION_STROKE_FRACTION
+            } else {
+                geometry.commStrokeWidth
+            }
+            commWindowLayer.draw(
+                canvas, geometry.commInnerTrack, p.commWindow, dteStroke,
+                commDteAngles, commDteArcCount,
+            )
+            commWindowLayer.draw(
+                canvas, geometry.commOuterTrack, p.commWindow, geometry.commStrokeWidth,
+                commRelayAngles, commRelayArcCount,
+            )
+        }
+
         // Printed on the dial, under the hands, the way dial text always is. The layer haloes its
         // own type in the background colour, which keeps it separated from the ticks and the arc.
         telemetryLayer.draw(
             canvas, geometry, p, telemetry, mode, epochMillis,
             fahrenheit, mmHg, dutyState, dutyMillis, vigilance.status, showClearHint,
             incidentMillis, incidentElapsedMillis, sensorLeft, sensorRight, layoutGeneration,
-            frameSymbol,
+            frameSymbol, roverIndex, relayWindowsValid, owltSeconds, dteBlocked,
         )
 
         handsLayer.drawHourMinute(canvas, geometry, p, hourAngle, minuteAngle)
@@ -761,7 +1019,15 @@ class MfdRenderer(
      */
     private fun planetHoursAt(epochMillis: Long, mode: Int, utcOffsetMillis: Long): Double =
         when (mode) {
-            PlanetMode.MARS -> AstroTime.marsTimeHours(epochMillis)
+            // The selected rover's mean clock, not MTC: the operator works the rover's sol, and
+            // every instant on the dial — hour hand, duty arc, daylight, comm windows — maps
+            // through this one line, so they can never disagree about whose time it is. The
+            // offset is the rover meridian in Mars milliseconds, eased by the transition, which
+            // is what makes a rover switch glide instead of snap; settled, it equals
+            // MarsSolarTime.lmstHours exactly.
+            PlanetMode.MARS ->
+                (MarsSolarTime.mtcHours(epochMillis) +
+                    utcOffsetMillis / MarsSolarTime.MARS_HOUR_MILLIS).mod(24.0)
             PlanetMode.MOON -> AstroTime.lunarTimeHours(epochMillis)
             else -> AstroTime.localHoursOfDay(epochMillis, utcOffsetMillis)
         }
@@ -833,6 +1099,9 @@ class MfdRenderer(
 
     companion object {
         private const val TAG = "MfdRenderer"
+
+        /** The blocked DTE line's width, as a fraction of its normal stroke. */
+        private const val CONJUNCTION_STROKE_FRACTION = 0.35f
 
         /**
          * Resting frame period: once a second.

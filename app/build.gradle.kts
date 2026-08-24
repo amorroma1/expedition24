@@ -48,7 +48,12 @@ val packPoi = tasks.register<PackPoi>("packPoi") {
 
 androidComponents {
     onVariants { variant ->
-        variant.sources.assets?.addGeneratedSourceDirectory(packPoi, PackPoi::outputDir)
+        // The site index is Earth's: the Mars face has no site lock, and 138 KB of aerodromes
+        // on a watch face for another planet is dead weight that would still have to pass the
+        // CI presence check. Every other flavor gets the asset exactly as before.
+        if (variant.flavorName != "mars") {
+            variant.sources.assets?.addGeneratedSourceDirectory(packPoi, PackPoi::outputDir)
+        }
     }
 }
 
@@ -159,8 +164,25 @@ android {
             // The updater looks for its own releases only: the tag prefix and the asset name are
             // build fields rather than constants so a build can never offer itself an APK that
             // is not the one it was compiled as.
+            buildConfigField("String", "WORLD", "\"earth\"")
             buildConfigField("String", "UPDATE_TAG_PREFIX", "\"v\"")
             buildConfigField("String", "UPDATE_ASSET", "\"app-earth-release.apk\"")
+        }
+        create("mars") {
+            dimension = "world"
+            // A separate application id so the Mars face installs beside the Earth one: the
+            // platform treats a different id as a different app, which here is the point.
+            // The namespace (R, BuildConfig) stays shared — only the installed identity moves.
+            applicationIdSuffix = ".mars"
+            // An independent version line: the platform compares versionCode per package, so
+            // the Mars face does not inherit Earth's 19 releases of history.
+            versionCode = 1
+            versionName = "0.1.0"
+            buildConfigField("String", "WORLD", "\"mars\"")
+            // "mars-v" cannot collide with Earth's bare "v": ReleaseCheck matches by prefix and
+            // then by exact asset name, and neither passes the other flavor's gate.
+            buildConfigField("String", "UPDATE_TAG_PREFIX", "\"mars-v\"")
+            buildConfigField("String", "UPDATE_ASSET", "\"app-mars-release.apk\"")
         }
     }
 

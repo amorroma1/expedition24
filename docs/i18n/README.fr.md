@@ -47,6 +47,18 @@ météo en abrégés METAR, l'aérodrome ou le port le plus proche, et les heure
   là où la plateforme le permet. Pas d'application compagnon, pas
   de compte, pas de télémétrie vers qui que ce soit.
 
+## MFD-24-Mars
+
+Le même instrument, une planète plus loin : un cadran séparé qui s'installe **à côté** de MFD-24
+et vit à l'heure d'un rover — `PERSEVERANCE` ou `CURIOSITY`. L'aiguille des heures fait un tour
+par sol (24 h 39 m), la bande Nadir porte le jour martien avec ses lisières crépusculaires, et
+deux lignes sur l'anneau des heures marquent les fenêtres de liaison : liaison directe avec la
+Terre à l'intérieur (mécanique céleste, hors ligne), passages des relais MRO, Odyssey et TGO à
+l'extérieur (éphémérides JPL Horizons). Après le sol de mission, derrière une antenne : le temps
+de trajet de la lumière vers la Terre, en direct.
+
+![](../screenshots/mars.png)
+
 ## Installation
 
 Wear OS 3.0+ (API 30). Téléchargez `app-earth-release.apk` depuis la

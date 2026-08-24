@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 R. Kravcov -->
+<!-- JPL's 2026 certificate chains to Sectigo Root R46, which entered public trust stores after
+     this watch's API 30 image was cut - so the platform alone cannot verify Horizons, and the
+     genuine public root rides in the APK instead. Scoped to the one host that needs it: every
+     other connection keeps the system's own judgement, and a compromised bundle could never
+     vouch for anything but ephemerides. Fingerprint (SHA-256, verifiable against Sectigo's
+     published roots): 7B:B6:47:A6:2A:EE:AC:88:BF:25:7A:A5:22:D0:1F:FE:A3:95:E0:AB:45:C7:3F:93:F6:56:54:EC:38:F2:5A:06 -->
+<network-security-config>
+    <domain-config>
+        <domain includeSubdomains="false">ssd.jpl.nasa.gov</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/sectigo_r46" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

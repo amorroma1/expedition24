@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 R. Kravcov -->
+<!-- Merged over the main manifest: the Mars flavor carries a domain-scoped trust anchor for
+     JPL Horizons, whose 2026 chain roots in Sectigo R46 - newer than this platform's trust
+     store. See res/xml/network_security_config.xml for the scope and the fingerprint. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:networkSecurityConfig="@xml/network_security_config" />
+</manifest>

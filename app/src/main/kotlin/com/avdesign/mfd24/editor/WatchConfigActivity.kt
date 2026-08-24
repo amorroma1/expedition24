@@ -82,6 +82,8 @@ import androidx.wear.watchface.editor.EditorSession
 import androidx.wear.watchface.style.UserStyleSetting
 import com.avdesign.mfd24.BuildConfig
 import com.avdesign.mfd24.R
+import com.avdesign.mfd24.astro.PlanetMode
+import com.avdesign.mfd24.astro.Rovers
 import com.avdesign.mfd24.export.LogExportActivity
 import com.avdesign.mfd24.export.RepoLinkActivity
 import com.avdesign.mfd24.update.ReleaseLinkActivity
@@ -198,6 +200,12 @@ class WatchConfigActivity : ComponentActivity() {
 /** Ending a duty on purpose is a decision, not an emergency, so it is not the alarm red. */
 private val Terracotta = Color(0xFFB85C38)
 
+/**
+ * Which world this build's editor sells. A compile-time constant, so the Earth half and
+ * the Mars half of the list are decided at build time and R8 drops whichever is dead.
+ */
+private val MARS_WORLD = BuildConfig.WORLD == PlanetMode.ID_MARS
+
 @Composable
 private fun ConfigScreen(
     session: EditorSession,
@@ -233,6 +241,11 @@ private fun ConfigScreen(
         session, StyleSchema.LOG_HEART_RATE, StyleSchema.LOG_HR_OFF
     )
     var weather by rememberOption(session, StyleSchema.WEATHER, StyleSchema.WEATHER_ON)
+    var rover by rememberOption(session, StyleSchema.ROVER, Rovers.ID_PERSEVERANCE)
+    var relayMro by rememberOption(session, StyleSchema.RELAY_MRO, StyleSchema.RELAY_ON)
+    var relayOdyssey by rememberOption(session, StyleSchema.RELAY_ODYSSEY, StyleSchema.RELAY_ON)
+    var relayMaven by rememberOption(session, StyleSchema.RELAY_MAVEN, StyleSchema.RELAY_ON)
+    var relayTgo by rememberOption(session, StyleSchema.RELAY_TGO, StyleSchema.RELAY_ON)
     var ambientDensity by rememberOption(
         session, StyleSchema.AMBIENT_DENSITY, StyleSchema.AMBIENT_FULL
     )
@@ -703,12 +716,85 @@ private fun ConfigScreen(
         // had not scrolled to yet.
         item(key = headerKey(SECTION_POSITION)) {
             SectionHeader(
-                text = stringResource(R.string.editor_section_position),
+                text = stringResource(
+                    if (MARS_WORLD) R.string.editor_section_rover
+                    else R.string.editor_section_position
+                ),
                 expanded = openSection == SECTION_POSITION,
                 onClick = { toggleSection(SECTION_POSITION) },
             )
         }
-        if (openSection == SECTION_POSITION) {
+        // On Mars the position section *is* the rover section: the site is the rover's, chosen
+        // here, and the relay toggles live beside it because they are bound to that site's sky.
+        if (openSection == SECTION_POSITION && MARS_WORLD) {
+            item {
+                OptionChip(
+                    label = stringResource(R.string.rover_perseverance),
+                    selected = rover == Rovers.ID_PERSEVERANCE,
+                    onClick = {
+                        session.select(StyleSchema.ROVER, Rovers.ID_PERSEVERANCE)
+                        rover = Rovers.ID_PERSEVERANCE
+                    },
+                )
+            }
+            item {
+                OptionChip(
+                    label = stringResource(R.string.rover_curiosity),
+                    selected = rover == Rovers.ID_CURIOSITY,
+                    onClick = {
+                        session.select(StyleSchema.ROVER, Rovers.ID_CURIOSITY)
+                        rover = Rovers.ID_CURIOSITY
+                    },
+                )
+            }
+            item { Hint(stringResource(R.string.editor_rover_rationale), hints) }
+            item {
+                SegmentedSetting(
+                    label = stringResource(R.string.editor_label_mro),
+                    options = RELAY_OPTIONS,
+                    selectedId = relayMro,
+                    onSelect = { id ->
+                        session.select(StyleSchema.RELAY_MRO, id)
+                        relayMro = id
+                    },
+                )
+            }
+            item {
+                SegmentedSetting(
+                    label = stringResource(R.string.editor_label_odyssey),
+                    options = RELAY_OPTIONS,
+                    selectedId = relayOdyssey,
+                    onSelect = { id ->
+                        session.select(StyleSchema.RELAY_ODYSSEY, id)
+                        relayOdyssey = id
+                    },
+                )
+            }
+            item {
+                SegmentedSetting(
+                    label = stringResource(R.string.editor_label_maven),
+                    options = RELAY_OPTIONS,
+                    selectedId = relayMaven,
+                    onSelect = { id ->
+                        session.select(StyleSchema.RELAY_MAVEN, id)
+                        relayMaven = id
+                    },
+                )
+            }
+            item {
+                SegmentedSetting(
+                    label = stringResource(R.string.editor_label_tgo),
+                    options = RELAY_OPTIONS,
+                    selectedId = relayTgo,
+                    onSelect = { id ->
+                        session.select(StyleSchema.RELAY_TGO, id)
+                        relayTgo = id
+                    },
+                )
+            }
+            item { Hint(stringResource(R.string.editor_relays_rationale), hints) }
+        }
+        if (openSection == SECTION_POSITION && !MARS_WORLD) {
 
             // Where the position comes from is the user's choice, not a reading of the OS permission.
             // It used to be the latter, which left no way to switch the device off: on API 30 an app
@@ -902,62 +988,68 @@ private fun ConfigScreen(
                         session.select(StyleSchema.NADIR, id)
                         nadir = id
                     },
-                    isEnabled = { hasPosition },
+                    isEnabled = { hasPosition || MARS_WORLD },
                 )
             }
-            if (!hasPosition) {
+            if (!hasPosition && !MARS_WORLD) {
                 item { Hint(stringResource(R.string.editor_nadir_needs_position), hints) }
             }
             // Below Nadir because it draws on Nadir: the sun's true position on the band, which
             // is a solar compass for whoever knows how to hold one. Gated the same way — with no
             // band there is nothing to read the mark against.
-            item {
-                SegmentedSetting(
-                    label = stringResource(R.string.editor_label_solar),
-                    options = SOLAR_OPTIONS,
-                    selectedId = solarMark,
-                    onSelect = { id ->
-                        session.select(StyleSchema.SOLAR_MARK, id)
-                        solarMark = id
-                    },
-                    isEnabled = { id ->
-                        id == StyleSchema.SOLAR_OFF ||
-                            (nadir == StyleSchema.NADIR_ON && hasPosition)
-                    },
-                )
+            if (!MARS_WORLD) {
+                item {
+                    SegmentedSetting(
+                        label = stringResource(R.string.editor_label_solar),
+                        options = SOLAR_OPTIONS,
+                        selectedId = solarMark,
+                        onSelect = { id ->
+                            session.select(StyleSchema.SOLAR_MARK, id)
+                            solarMark = id
+                        },
+                        isEnabled = { id ->
+                            id == StyleSchema.SOLAR_OFF ||
+                                (nadir == StyleSchema.NADIR_ON && hasPosition)
+                        },
+                    )
+                }
+                if (solarMark == StyleSchema.SOLAR_ON) {
+                    item { Hint(stringResource(R.string.editor_solar_note), hints) }
+                }
             }
-            if (solarMark == StyleSchema.SOLAR_ON) {
-                item { Hint(stringResource(R.string.editor_solar_note), hints) }
+            if (!MARS_WORLD) {
+                item {
+                    SegmentedSetting(
+                        label = stringResource(R.string.editor_label_lunar),
+                        options = LUNAR_OPTIONS,
+                        selectedId = lunarMark,
+                        onSelect = { id ->
+                            session.select(StyleSchema.LUNAR_MARK, id)
+                            lunarMark = id
+                        },
+                        isEnabled = { id ->
+                            id == StyleSchema.LUNAR_OFF ||
+                                (nadir == StyleSchema.NADIR_ON && hasPosition)
+                        },
+                    )
+                }
+                if (lunarMark == StyleSchema.LUNAR_ON) {
+                    item { Hint(stringResource(R.string.editor_lunar_note), hints) }
+                }
             }
-            item {
-                SegmentedSetting(
-                    label = stringResource(R.string.editor_label_lunar),
-                    options = LUNAR_OPTIONS,
-                    selectedId = lunarMark,
-                    onSelect = { id ->
-                        session.select(StyleSchema.LUNAR_MARK, id)
-                        lunarMark = id
-                    },
-                    isEnabled = { id ->
-                        id == StyleSchema.LUNAR_OFF ||
-                            (nadir == StyleSchema.NADIR_ON && hasPosition)
-                    },
-                )
-            }
-            if (lunarMark == StyleSchema.LUNAR_ON) {
-                item { Hint(stringResource(R.string.editor_lunar_note), hints) }
-            }
-            item {
-                SegmentedSetting(
-                    label = stringResource(R.string.editor_label_weather),
-                    options = WEATHER_OPTIONS,
-                    selectedId = weather,
-                    onSelect = { id ->
-                        session.select(StyleSchema.WEATHER, id)
-                        weather = id
-                    },
-                    isEnabled = { id -> hasPosition || id == StyleSchema.WEATHER_OFF },
-                )
+            if (!MARS_WORLD) {
+                item {
+                    SegmentedSetting(
+                        label = stringResource(R.string.editor_label_weather),
+                        options = WEATHER_OPTIONS,
+                        selectedId = weather,
+                        onSelect = { id ->
+                            session.select(StyleSchema.WEATHER, id)
+                            weather = id
+                        },
+                        isEnabled = { id -> hasPosition || id == StyleSchema.WEATHER_OFF },
+                    )
+                }
             }
             // Always-on wears the lume palette, dimmed -- there is no separate colour to choose, and
             // so nothing changes hue when the watch wakes. All that is left is whether it is thinned.
@@ -996,15 +1088,16 @@ private fun ConfigScreen(
 
         // ---- Units -----------------------------------------------------------------------------
         // Both rows labelled: unlabelled, the four chips ran together and the second pair read as
-        // more of the first.
-        item(key = headerKey(SECTION_UNITS)) {
+        // more of the first. Earth only: both units exist for the weather row, and the QFE slot
+        // prints hPa regardless.
+        if (!MARS_WORLD) item(key = headerKey(SECTION_UNITS)) {
             SectionHeader(
                 text = stringResource(R.string.editor_section_units),
                 expanded = openSection == SECTION_UNITS,
                 onClick = { toggleSection(SECTION_UNITS) },
             )
         }
-        if (openSection == SECTION_UNITS) {
+        if (openSection == SECTION_UNITS && !MARS_WORLD) {
             item {
                 SegmentedSetting(
                     label = stringResource(R.string.editor_label_temperature),
@@ -1900,6 +1993,10 @@ private val SOLAR_OPTIONS = listOf(
 private val LUNAR_OPTIONS = listOf(
     Segment(StyleSchema.LUNAR_OFF, R.string.lunar_off, R.string.lunar_off_sr),
     Segment(StyleSchema.LUNAR_ON, R.string.lunar_on, R.string.lunar_on_sr),
+)
+private val RELAY_OPTIONS = listOf(
+    Segment(StyleSchema.RELAY_OFF, R.string.relay_off, R.string.relay_off_sr),
+    Segment(StyleSchema.RELAY_ON, R.string.relay_on, R.string.relay_on_sr),
 )
 private val VIGILANCE_OPTIONS = listOf(
     Segment(StyleSchema.VIGILANCE_OFF, R.string.vigilance_off, R.string.vigilance_off_sr),

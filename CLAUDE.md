@@ -168,6 +168,55 @@ repositioning; their tags remain. Settings reset on update: the schema changed f
 
 ---
 
+## The mars branch
+
+**Published 2026-08-24**: the branch `mars` is on the remote as **one squashed commit** on top
+of `main` — the user's call, made explicitly; the same one-commit discipline as `main`, so
+amend/re-squash rather than stacking commits before any future publish. The pre-squash
+development history (19 commits) is kept **locally only** on `mars-pre-squash-2026-08-24`,
+never pushed. No release object exists for the Mars face yet; the updater fields
+(`mars-v` / `app-mars-release.apk`) are in place for when one does, and the repo-global
+`releases/latest` gap is **closed**: `ReleaseCheck` reads the release *list* and each flavor
+filters to its own prefix and asset, taking the highest version numerically — so neither face
+can eclipse the other's updates, and drafts, prereleases and asset-less releases are skipped
+rather than announced. Pinned in `ReleaseCheckTest` with both faces in one payload.
+
+The face: `mars` flavor, `com.avdesign.mfd24.mars`, "MFD-24-Mars", installs beside the Earth
+face. Verified on the watch through 2026-08-24: rover-local LMST (AM2000, `astro/MarsSolarTime`),
+mission sols (`SOL 4994` for Curiosity checks out), the daylight band with −6° twilight
+shoulders (no sun mark on Mars, by choice with the user: on a mean-time dial the only
+edge-touching sun is the hour hand itself, so a mark either restates the hand or hangs an
+equation-of-time clear of the band — see DESIGN.md), the DTE line against live Horizons to
+~0.15°, relay passes for MRO/Odyssey/TGO, the
+light time behind its dish (`15:42`, SI minutes — light time owes nothing to any planet's
+rotation), rover switching with the full-dial glide (the rover meridian is the frame offset
+through `DialTransition`, whose day is now a parameter), the dial-top flip, and the duty ring
+at 0.605 r. The third-hue rule was seen flipping live: green lume turned both comm lines red.
+
+Facts paid for on first contact, all in code and tests:
+
+- **Horizons wants Mars site longitude west-positive** and the latitude planetographic; the
+  Sun-at-LTST-noon check in `EarthSkyTest` pins the convention.
+- **JPL's 2026 certificate chains to Sectigo Root R46**, absent from the API 30 trust store.
+  The mars flavor carries that public root as a domain-scoped anchor for `ssd.jpl.nasa.gov`
+  only (`src/mars/res/xml/network_security_config.xml`, fingerprint inside). Do not widen it.
+- **MAVEN's published ephemeris ends 2026-03-01.** "No ephemeris for target" is a distinct
+  parse answer (`NO_COVERAGE`): the spacecraft contributes empty windows for a day instead of
+  holding the whole relay line in `NO EPHEMERIS`. The notice means "cannot compute", never
+  "one orbiter's file ran out".
+- **The relay cache is per site and never reused across rovers** — a pass over Jezero is not a
+  pass over Gale. A rover switch or relay toggle enqueues one expedited fetch
+  (`MarsEphemerisWorker.fetchNow`); the six-hourly schedule alone left `NO EPHEMERIS` standing
+  for hours.
+
+Validity is per instant, not per fetch: `relayValid` holds only while every enabled satellite's
+table reaches past now. The Earth daylight path is gated off the mars flavor
+(`TelemetryRepository.refreshDaylight`); `MarsCommRepository` owns the band there. The mars APK
+ships without `poi_v1.bin` and CI asserts the absence. Not yet exercised on hardware: always-on
+with the comm lines, and a real solar conjunction (next ~January 2028).
+
+---
+
 ## Releasing
 
 **One release object, one tag, one commit.** As of 2026-08-22 the repository carries a single
@@ -463,8 +512,9 @@ the editor can sit open. Unclamped, a past start falls through `schedule()` into
 start with the chime — indistinguishable from a mis-tap. `BookableStartTest` pins the floor.
 
 **The updater trusts the platform, and only the platform.** `update/ReleaseCheck` asks
-`releases/latest` (flavor-scoped via `UPDATE_TAG_PREFIX`/`UPDATE_ASSET` buildConfig fields, so an
-Earth watch never sees a Mars build), compares versions numerically per component — a string
+the release *list* and filters to its own flavor (via `UPDATE_TAG_PREFIX`/`UPDATE_ASSET`
+buildConfig fields, so an Earth watch never sees a Mars build, and — since the list replaced the
+repo-global `releases/latest` — neither face's newest can hide the other's), compares versions numerically per component — a string
 compare buries `2.10.0` under `2.9.1` — and `UpdateInstaller` streams the APK into a
 `PackageInstaller` session: the system prompt confirms, the package manager enforces the signing
 key. One cached build in `cache/updates/`, pruned to the latest. The daily check rides

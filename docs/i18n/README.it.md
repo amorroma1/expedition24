@@ -46,6 +46,18 @@ l'aeroporto o il porto più vicino, le ore di luce rimanenti.
   dove la piattaforma lo consente. Nessuna app companion, nessun account,
   nessuna telemetria verso terzi.
 
+## MFD-24-Mars
+
+Lo stesso strumento, un pianeta più in là: un quadrante separato che si installa **accanto** a
+MFD-24 e tiene l'ora di un rover — `PERSEVERANCE` o `CURIOSITY`. La lancetta delle ore compie un
+giro per sol (24 h 39 m), la banda Nadir porta il giorno marziano con le sue spalle di
+crepuscolo, e due linee sull'anello delle ore segnano le finestre di collegamento: il canale
+diretto con la Terra all'interno (meccanica celeste, offline), i passaggi dei relè MRO, Odyssey
+e TGO all'esterno (effemeridi JPL Horizons). Dopo il sol di missione, dietro un'antenna: il tempo
+di volo della luce verso la Terra, in diretta.
+
+![](../screenshots/mars.png)
+
 ## Installazione
 
 Wear OS 3.0+ (API 30). Scaricare `app-earth-release.apk` dall'

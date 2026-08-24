@@ -6,6 +6,8 @@ package com.avdesign.mfd24.data
 import android.content.Context
 import android.location.Location
 import android.util.Log
+import com.avdesign.mfd24.BuildConfig
+import com.avdesign.mfd24.astro.PlanetMode
 import com.avdesign.mfd24.astro.SolarDay
 import com.avdesign.mfd24.astro.SolarTime
 import com.avdesign.mfd24.geo.PoiFormat
@@ -119,6 +121,10 @@ class TelemetryRepository private constructor(context: Context) {
      */
     @Synchronized
     fun refreshDaylight(nowMillis: Long) {
+        // On the Mars flavor the daylight is the rover's, owned by MarsCommRepository: an Earth
+        // sunrise computed from whatever fix this store still holds would overwrite it with a
+        // band at meaningless hours.
+        if (BuildConfig.WORLD != PlanetMode.ID_EARTH) return
         val lat = activeLatitude
         val lon = activeLongitude
         if (lat.isNaN() || lon.isNaN()) {

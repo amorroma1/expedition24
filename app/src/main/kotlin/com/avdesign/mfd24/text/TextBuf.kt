@@ -113,6 +113,25 @@ class TextBuf(capacity: Int) {
         )
         val LIT_SOL: CharArray = "SOL ".toCharArray()
         val LIT_MTC: CharArray = "MTC ".toCharArray()
+
+        /**
+         * The relay line cannot be computed: no ephemerides on file reaching past now. Twelve
+         * characters, inside the sixteen the row is budgeted for.
+         */
+        val LIT_NO_EPHEMERIS: CharArray = "NO EPHEMERIS".toCharArray()
+
+        /**
+         * Solar conjunction: Earth is inside the corona, seen from the rover, and the direct
+         * link is down however the horizon looks. Replaces the light-time figure — a delay for
+         * a link that cannot pass is noise, and the flag is the news.
+         */
+        val LIT_CONJ: CharArray = "CONJ".toCharArray()
+
+        /** Rover names for the Mars site row, indexed by [com.avdesign.mfd24.astro.Rovers]. */
+        val ROVER_NAMES: Array<CharArray> = arrayOf(
+            "PERSEVERANCE".toCharArray(),
+            "CURIOSITY".toCharArray(),
+        )
         val LIT_LTC: CharArray = "LTC ".toCharArray()
         val LIT_LUNAR_DAY: CharArray = "LUNAR DAY ".toCharArray()
         val LIT_QNH: CharArray = "Q".toCharArray()

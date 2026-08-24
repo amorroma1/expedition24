@@ -11,6 +11,8 @@ import androidx.wear.watchface.style.UserStyleSetting.ListUserStyleSetting
 import androidx.wear.watchface.style.UserStyleSetting.ListUserStyleSetting.ListOption
 import androidx.wear.watchface.style.WatchFaceLayer
 import com.avdesign.mfd24.R
+import com.avdesign.mfd24.astro.PlanetMode
+import com.avdesign.mfd24.astro.Rovers
 import com.avdesign.mfd24.data.Alerts
 import com.avdesign.mfd24.data.SensorSlots
 import com.avdesign.mfd24.render.AmbientAuto
@@ -38,6 +40,15 @@ object StyleSchema {
     val AMBIENT_DENSITY: UserStyleSetting.Id = UserStyleSetting.Id("ambient_density")
     val SENSOR_LEFT: UserStyleSetting.Id = UserStyleSetting.Id("sensor_left")
     val SENSOR_RIGHT: UserStyleSetting.Id = UserStyleSetting.Id("sensor_right")
+    val ROVER: UserStyleSetting.Id = UserStyleSetting.Id("rover")
+    val RELAY_MRO: UserStyleSetting.Id = UserStyleSetting.Id("relay_mro")
+    val RELAY_ODYSSEY: UserStyleSetting.Id = UserStyleSetting.Id("relay_odyssey")
+    val RELAY_MAVEN: UserStyleSetting.Id = UserStyleSetting.Id("relay_maven")
+    val RELAY_TGO: UserStyleSetting.Id = UserStyleSetting.Id("relay_tgo")
+
+    /** Satellite order for the relay bitmask: MRO, Odyssey, MAVEN, TGO. */
+    val RELAY_SETTINGS: List<UserStyleSetting.Id> =
+        listOf(RELAY_MRO, RELAY_ODYSSEY, RELAY_MAVEN, RELAY_TGO)
 
     const val TEMP_CELSIUS: String = "c"
     const val TEMP_FAHRENHEIT: String = "f"
@@ -61,6 +72,18 @@ object StyleSchema {
 
     const val WEATHER_OFF: String = "off"
     const val WEATHER_ON: String = "on"
+
+    const val RELAY_OFF: String = "off"
+    const val RELAY_ON: String = "on"
+
+    /** The enabled relay satellites as a bitmask in [RELAY_SETTINGS] order. */
+    fun relayMask(style: UserStyle): Int {
+        var mask = 0
+        for (i in RELAY_SETTINGS.indices) {
+            if (optionId(style, RELAY_SETTINGS[i], RELAY_ON) == RELAY_ON) mask = mask or (1 shl i)
+        }
+        return mask
+    }
 
     const val VIGILANCE_OFF: String = "off"
     const val VIGILANCE_ON: String = "on"
@@ -119,27 +142,70 @@ object StyleSchema {
     }
 
 
-    fun create(resources: Resources): UserStyleSchema = UserStyleSchema(
-        listOfNotNull(
-            paletteSetting(resources),
-            tempSetting(resources),
-            pressureSetting(resources),
-            midnightLabelSetting(resources),
-            dialTopSetting(resources),
-            nadirSetting(resources),
-            solarMarkSetting(resources),
-            lunarMarkSetting(resources),
-            weatherSetting(resources),
-            vigilanceSetting(resources),
-            vigilanceIntervalSetting(resources),
-            vibeStrengthSetting(resources),
-            sosSoundSetting(resources),
-            logHeartRateSetting(resources),
-            sensorSlotSetting(resources, SENSOR_LEFT, R.string.style_sensor_left_name),
-            sensorSlotSetting(resources, SENSOR_RIGHT, R.string.style_sensor_right_name),
-            ambientDensitySetting(resources),
+    /**
+     * The setting list for one world, as pure data — [create] builds from exactly this, so the
+     * split is testable on the JVM, where a Resources cannot be had. Mars trades the weather,
+     * both sky marks and both unit rows (the units existed only for the weather row) for the
+     * rover selector and the four relay toggles. No solar mark on Mars by choice: on a mean-time
+     * dial the only sun that touches the band's edges at the physical sunrise and sunset is the
+     * hour hand itself, so the hand and the band already say everything a dot could.
+     */
+    fun settingIds(planetMode: Int): List<UserStyleSetting.Id> {
+        val mars = planetMode == PlanetMode.MARS
+        return listOfNotNull(
+            PALETTE,
+            TEMP_UNIT.takeUnless { mars },
+            PRESSURE_UNIT.takeUnless { mars },
+            MIDNIGHT_LABEL,
+            DIAL_TOP,
+            ROVER.takeIf { mars },
+            NADIR,
+            SOLAR_MARK.takeUnless { mars },
+            LUNAR_MARK.takeUnless { mars },
+            WEATHER.takeUnless { mars },
+            RELAY_MRO.takeIf { mars },
+            RELAY_ODYSSEY.takeIf { mars },
+            RELAY_MAVEN.takeIf { mars },
+            RELAY_TGO.takeIf { mars },
+            VIGILANCE,
+            VIGILANCE_INTERVAL,
+            VIBE_STRENGTH,
+            SOS_SOUND,
+            LOG_HEART_RATE,
+            SENSOR_LEFT,
+            SENSOR_RIGHT,
+            AMBIENT_DENSITY,
         )
-    )
+    }
+
+    fun create(resources: Resources, planetMode: Int): UserStyleSchema =
+        UserStyleSchema(settingIds(planetMode).map { settingFor(it, resources) })
+
+    private fun settingFor(id: UserStyleSetting.Id, res: Resources): UserStyleSetting = when (id) {
+        PALETTE -> paletteSetting(res)
+        TEMP_UNIT -> tempSetting(res)
+        PRESSURE_UNIT -> pressureSetting(res)
+        MIDNIGHT_LABEL -> midnightLabelSetting(res)
+        DIAL_TOP -> dialTopSetting(res)
+        ROVER -> roverSetting(res)
+        NADIR -> nadirSetting(res)
+        SOLAR_MARK -> solarMarkSetting(res)
+        LUNAR_MARK -> lunarMarkSetting(res)
+        WEATHER -> weatherSetting(res)
+        RELAY_MRO -> relaySetting(res, RELAY_MRO, R.string.style_relay_mro_name)
+        RELAY_ODYSSEY -> relaySetting(res, RELAY_ODYSSEY, R.string.style_relay_odyssey_name)
+        RELAY_MAVEN -> relaySetting(res, RELAY_MAVEN, R.string.style_relay_maven_name)
+        RELAY_TGO -> relaySetting(res, RELAY_TGO, R.string.style_relay_tgo_name)
+        VIGILANCE -> vigilanceSetting(res)
+        VIGILANCE_INTERVAL -> vigilanceIntervalSetting(res)
+        VIBE_STRENGTH -> vibeStrengthSetting(res)
+        SOS_SOUND -> sosSoundSetting(res)
+        LOG_HEART_RATE -> logHeartRateSetting(res)
+        SENSOR_LEFT -> sensorSlotSetting(res, SENSOR_LEFT, R.string.style_sensor_left_name)
+        SENSOR_RIGHT -> sensorSlotSetting(res, SENSOR_RIGHT, R.string.style_sensor_right_name)
+        AMBIENT_DENSITY -> ambientDensitySetting(res)
+        else -> throw IllegalArgumentException("no factory for setting " + id)
+    }
 
     /**
      * Duty arc stroke width, as a fraction of the dial radius.
@@ -293,6 +359,59 @@ object StyleSchema {
             res,
             R.string.style_lunar_name,
             R.string.style_lunar_desc,
+            null,
+            options,
+            listOf(WatchFaceLayer.BASE),
+            defaultOption = options[0],
+        )
+    }
+
+    /**
+     * Which rover the Mars face is an instrument for. Everything site-bound — the dial's own
+     * clock, the daylight band, both comm lines, the SOL readout — follows this one choice.
+     */
+    private fun roverSetting(res: Resources): ListUserStyleSetting {
+        val options = listOf(
+            listOption(
+                res, Rovers.ID_PERSEVERANCE,
+                R.string.rover_perseverance, R.string.rover_perseverance_sr,
+            ),
+            listOption(
+                res, Rovers.ID_CURIOSITY,
+                R.string.rover_curiosity, R.string.rover_curiosity_sr,
+            ),
+        )
+        return ListUserStyleSetting(
+            ROVER,
+            res,
+            R.string.style_rover_name,
+            R.string.style_rover_desc,
+            null,
+            options,
+            listOf(WatchFaceLayer.BASE, WatchFaceLayer.COMPLICATIONS_OVERLAY),
+            defaultOption = options[0],
+        )
+    }
+
+    /**
+     * One relay orbiter's place in the outer comm line. Four independent toggles rather than a
+     * single switch, because operators care which spacecraft a pass belongs to; all on by
+     * default, because the union is the honest picture until somebody narrows it.
+     */
+    private fun relaySetting(
+        res: Resources,
+        id: UserStyleSetting.Id,
+        nameRes: Int,
+    ): ListUserStyleSetting {
+        val options = listOf(
+            listOption(res, RELAY_ON, R.string.relay_on, R.string.relay_on_sr),
+            listOption(res, RELAY_OFF, R.string.relay_off, R.string.relay_off_sr),
+        )
+        return ListUserStyleSetting(
+            id,
+            res,
+            nameRes,
+            R.string.style_relay_desc,
             null,
             options,
             listOf(WatchFaceLayer.BASE),
