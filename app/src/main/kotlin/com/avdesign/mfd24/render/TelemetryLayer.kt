@@ -11,6 +11,7 @@ import android.graphics.Typeface
 import com.avdesign.mfd24.astro.AstroTime
 import com.avdesign.mfd24.astro.PlanetMode
 import com.avdesign.mfd24.data.TelemetryState
+import com.avdesign.mfd24.health.VitalRings
 import com.avdesign.mfd24.data.VigilanceState
 import com.avdesign.mfd24.data.WatchShiftState
 import com.avdesign.mfd24.data.WeatherCondition
@@ -93,6 +94,17 @@ class TelemetryLayer {
     private var symbolMode = -1
     private var symbolLayout = -1
 
+    /** Whether the slot pictograms wear the rings' colours; the wellness face's own legend. */
+    private var vitalGlyphColors = false
+
+    /** How hard the current quarter-hour is working, for the walking figure's own colour. */
+    private var slotEffort = 0
+
+    /** The wellness rows' own pictograms — a heart and a walking figure, at readout size. */
+    private val heartRowPath = Path()
+    private val stepsRowPath = Path()
+    private var rowGlyphLayout = -1
+
     private val glyphPath = Path()
 
     /** Type and flags packed together — both pick the pictogram, so both are the cache key. */
@@ -123,7 +135,21 @@ class TelemetryLayer {
         sensorRight: Int,
         layoutGeneration: Int,
         frameSymbol: Boolean,
+        /** Wellness face: last night's sleep in minutes, or a negative when none is known. */
+        sleepMinutes: Int = -1,
+        /** Wellness face: the day's score, 0..100, or a negative before one can be computed. */
+        dayScore: Int = -1,
+        /** Wellness face: the resting pulse from the day's own samples, or a negative. */
+        restingBpm: Int = -1,
+        /** Wellness face: the day's steps as the recorder counted them, or a negative. */
+        stepsToday: Int = -1,
+        /** Wellness face: draw the body rows instead of the weather and site ones. */
+        vitalRows: Boolean = false,
+        /** Wellness face: how hard the quarter-hour under way is working, 0..255. */
+        currentEffort: Int = 0,
     ) {
+        vitalGlyphColors = vitalRows
+        slotEffort = currentEffort
         buildLines(state, planetMode, epochMillis, fahrenheit, mmHg)
         if (vigilanceStatus == VigilanceState.INCIDENT) {
             buildIncident(incidentMillis, incidentElapsedMillis)
@@ -142,11 +168,20 @@ class TelemetryLayer {
         textPaint.textAlign = Paint.Align.CENTER
         haloPaint.textAlign = Paint.Align.CENTER
 
-        drawVigilanceStatus(canvas, g, palette, vigilanceStatus, showClearHint)
+        drawVigilanceStatus(canvas, g, palette, vigilanceStatus, showClearHint, quiet = vitalRows)
         // Before the readout rather than after, because the rows below have early returns and the
         // battery does not depend on any of them.
         drawBattery(canvas, g, palette, state.batteryPercent)
         drawSensorSlots(canvas, g, palette, state, sensorLeft, sensorRight, layoutGeneration)
+
+        // The wellness face reads its own four rows and returns: no duty, no weather, no site.
+        if (vitalRows) {
+            drawVitalRows(
+                canvas, g, palette, state, sleepMinutes, dayScore, restingBpm, stepsToday,
+                layoutGeneration,
+            )
+            return
+        }
 
         // Duty leads: it is the row that changes meaning, and ZULU sits below it where the dial is
         // wider — which is what lets the date group share the line. An incident takes the row
@@ -213,6 +248,59 @@ class TelemetryLayer {
         } else {
             drawHaloed(canvas, line2, g.cx, g.telemetryLineY[3])
         }
+    }
+
+    /**
+     * The wellness face's readout: what the day did to the body, in the order it is asked about.
+     *
+     * Row 1 carries last night and the day's standing — `SLP 7:12 DAY82` — where the duty face
+     * keeps the shift, because that is the morning's first question. Rows 3 and 4 are the two
+     * live readings behind their own pictograms. Every row obeys the face's standing rule: a
+     * reading that does not exist yet leaves *no* row rather than a row of dashes, so an empty
+     * line always means "not known", never "measured as nothing".
+     */
+    private fun drawVitalRows(
+        canvas: Canvas,
+        g: Geometry,
+        palette: Palette,
+        state: TelemetryState,
+        sleepMinutes: Int,
+        dayScore: Int,
+        restingBpm: Int,
+        stepsToday: Int,
+        layoutGeneration: Int,
+    ) {
+        // The day's standing, above the hub where the duty row sits on the other face — and the
+        // score alone, because the rings now own the band this row used to reach into. How long
+        // last night was is on the amber ring and in the report; a number for it here would have
+        // to be drawn through the sleep ring to fit.
+        if (dayScore >= 0) {
+            line1.clear().lit(TextBuf.LIT_SCORE).uint(dayScore)
+            textPaint.color = palette.lume
+            drawHaloed(canvas, line1, g.cx, g.telemetryLineY[0])
+        }
+
+        textPaint.color = palette.lume
+        drawHaloed(canvas, zulu, g.cx, g.telemetryLineY[1])
+
+        if (rowGlyphLayout != layoutGeneration) {
+            Glyphs.buildHeart(g.glyphBox, heartRowPath)
+            Glyphs.buildPedestrian(g.glyphBox, stepsRowPath)
+            rowGlyphLayout = layoutGeneration
+        }
+
+        // No steps row: a slot beside the hub carries that figure, and two copies of one number
+        // on a dial this size is the pair thrown away — the same rule the slots are written to.
+        // What the rows keep is what nothing else says: the day's standing, and the clock.
+    }
+
+    /** Thousands past five figures, the sensor slot's own rule: `8412`, then `12.4K`. */
+    private fun appendStepCount(buf: TextBuf, steps: Int) {
+        if (steps < 10_000) {
+            buf.uint(steps)
+            return
+        }
+        buf.uint(steps / 1000).ch('.').uint((steps % 1000) / 100).ch('K')
     }
 
     /**
@@ -325,7 +413,7 @@ class TelemetryLayer {
         val textWidth = sensor.length * g.sensorTextSize * Geometry.MONO_ADVANCE
         val shift = (g.sensorGlyphSize + g.sensorGlyphGap) * 0.5f
         drawSensorGlyph(
-            canvas, g, palette, kind, x - (textWidth + g.sensorGlyphGap) * 0.5f,
+            canvas, g, palette, state, kind, x - (textWidth + g.sensorGlyphGap) * 0.5f,
             slot, layoutGeneration,
         )
         drawHaloed(canvas, sensor, x + shift, g.sensorLineY)
@@ -342,6 +430,7 @@ class TelemetryLayer {
         canvas: Canvas,
         g: Geometry,
         palette: Palette,
+        state: TelemetryState,
         kind: Int,
         centreX: Float,
         slot: Int,
@@ -366,7 +455,18 @@ class TelemetryLayer {
             sensorGlyphLayout[slot] = layoutGeneration
             sensorGlyphX[slot] = centreX
         }
-        glyphPaint.color = palette.lumeSoft
+        // On the wellness face the pictogram wears its own ring's colour: the heart takes the
+        // pulse zone the reading falls in, the walking figure the green the activity ring is
+        // drawing. It is the shortest possible legend — the wearer learns what the rings mean
+        // by glancing at a number they already understand — and it costs nothing, because both
+        // colours were computed for the rings anyway.
+        glyphPaint.color = when {
+            !vitalGlyphColors -> palette.lumeSoft
+            kind == SLOT_HEART_RATE && state.heartRate > 0 ->
+                VitalRings.pulseColor(state.heartRate)
+            kind == SLOT_STEPS && slotEffort > 0 -> VitalRings.activityColor(slotEffort)
+            else -> palette.lumeSoft
+        }
         canvas.drawPath(path, glyphPaint)
     }
 
@@ -451,6 +551,7 @@ class TelemetryLayer {
         palette: Palette,
         status: Int,
         showClearHint: Boolean,
+        quiet: Boolean,
     ) {
         val label = when (status) {
             VigilanceState.PROMPT -> TextBuf.LIT_VIGIL_PROMPT
@@ -458,9 +559,18 @@ class TelemetryLayer {
             // The first tap of the clearing pair answers with the second half of the gesture,
             // right where the eyes already are. MAN DOWN itself is not lost: the duty row still
             // carries the incident's time, and the word comes back the moment the hint expires.
-            VigilanceState.INCIDENT ->
-                if (showClearHint) TextBuf.LIT_TAP_AGAIN else TextBuf.LIT_MAN_DOWN
-            VigilanceState.OFF_BODY -> TextBuf.LIT_OFF_WRIST
+            //
+            // On the wellness face the standing word is dropped and only the half of the gesture
+            // that asks for an answer is kept. The monitor is the same monitor and the record is
+            // the same record — the hub still holds the accent and the log still has the entry —
+            // but a face somebody wears to look at their sleep should not carry MAN DOWN across
+            // it all week because one nudge went unanswered on a Tuesday.
+            VigilanceState.INCIDENT -> when {
+                showClearHint -> TextBuf.LIT_TAP_AGAIN
+                quiet -> return
+                else -> TextBuf.LIT_MAN_DOWN
+            }
+            VigilanceState.OFF_BODY -> if (quiet) return else TextBuf.LIT_OFF_WRIST
             else -> return
         }
         textPaint.textSize = g.statusTextSize

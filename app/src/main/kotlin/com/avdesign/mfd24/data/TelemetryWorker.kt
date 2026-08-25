@@ -37,6 +37,7 @@ class TelemetryWorker(
         // Piggybacks on the run the radio is already up for; gated to once a day inside, and a
         // failed check must never fail the weather it rode in on.
         runCatching { UpdateNotifier.checkAndNotify(applicationContext, System.currentTimeMillis()) }
+        repository.refreshMarks(System.currentTimeMillis())
         return when (repository.refresh(allowActiveFix = active, nowMillis = System.currentTimeMillis())) {
             RefreshOutcome.OK -> Result.success()
             // Nothing to retry until the user grants access, and WorkManager would just burn slots.

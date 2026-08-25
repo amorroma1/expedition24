@@ -15,7 +15,13 @@ import kotlin.math.sin
  * [rebuild] is the only place in the drawing path that allocates, and it runs only when the surface
  * bounds actually change. Everything the per-frame code touches is a preallocated array or path.
  */
-class Geometry {
+class Geometry(
+    /**
+     * Whether the readout is drawn for the wellness face, which keeps its rows close to the hub
+     * so the three rings can have the band the duty face gives to type.
+     */
+    private val vitalReadout: Boolean = false,
+) {
 
     var width: Int = 0
         private set
@@ -85,6 +91,34 @@ class Geometry {
      */
     val daylightTrack: RectF = RectF()
     var daylightWidth: Float = 0f
+        private set
+
+    // --- The wellness face's three rings -------------------------------------------------------
+
+    /** Pulse, activity and sleep, read from the outside in under the hour hand's point. */
+    val pulseTrack: RectF = RectF()
+    val activityTrack: RectF = RectF()
+    val sleepTrack: RectF = RectF()
+
+    var ringWidthVital: Float = 0f
+        private set
+
+    // --- The day's marks on the daylight band ---------------------------------------------------
+
+    /** Calendar spans, on the band's outer edge where they crowd nothing. */
+    val eventTrack: RectF = RectF()
+
+    var eventWidth: Float = 0f
+        private set
+
+    /** The next alarm, as a notch across the band's own cross-section. */
+    var alarmInnerRadius: Float = 0f
+        private set
+
+    var alarmOuterRadius: Float = 0f
+        private set
+
+    var alarmStrokeWidth: Float = 0f
         private set
 
     // --- Hands -----------------------------------------------------------------------------
@@ -199,6 +233,15 @@ class Geometry {
         setRadius(dutyArcTrack, DUTY_ARC_RADIUS)
         setRadius(daylightTrack, (TICK_HOUR_INNER + TICK_CARDINAL_OUTER) / 2f)
         daylightWidth = r * (TICK_CARDINAL_OUTER - TICK_HOUR_INNER)
+        setRadius(eventTrack, EVENT_TRACK_RADIUS)
+        eventWidth = r * EVENT_WIDTH
+        alarmInnerRadius = r * TICK_HOUR_INNER
+        alarmOuterRadius = r * TICK_CARDINAL_OUTER
+        alarmStrokeWidth = r * ALARM_STROKE
+        setRadius(pulseTrack, PULSE_RING_RADIUS)
+        setRadius(activityTrack, ACTIVITY_RING_RADIUS)
+        setRadius(sleepTrack, SLEEP_RING_RADIUS)
+        ringWidthVital = r * VITAL_RING_WIDTH
         secondsMarkerBaseRadius = r * SECONDS_MARKER_BASE
         // Pitch between two minute ticks, measured along the arc the cursor's base sits on.
         val pitch = 2.0 * Math.PI * secondsMarkerBaseRadius / MINUTE_TICKS
@@ -293,7 +336,7 @@ class Geometry {
         // 24 h scale it read as a stray tick mark rather than as part of the hand. It stops just
         // short of the hour numerals, whose inner edge is around 0.638 r, so it points at them
         // without overlapping them.
-        val hLen = r * 0.620f
+        val hLen = r * HOUR_HAND_TIP
         val hWide = r * 0.032f
         val tail = r * 0.115f
         hourHand.reset()
@@ -359,19 +402,29 @@ class Geometry {
         out.op(tip, Path.Op.INTERSECT)
     }
 
+    /** The baselines this face's readout uses. */
+    private fun lineBaselines(): FloatArray =
+        if (vitalReadout) VITAL_LINE_BASELINES else LINE_BASELINES
+
+    private fun batteryBaseline(): Float =
+        if (vitalReadout) VITAL_BATTERY_BASELINE else BATTERY_BASELINE
+
+    private fun sensorOffsetX(): Float =
+        if (vitalReadout) VITAL_SENSOR_OFFSET_X else SENSOR_OFFSET_X
+
     private fun buildTelemetry() {
         telemetryTextSize = r * TEXT_SIZE
         for (i in LINE_BASELINES.indices) {
-            telemetryLineY[i] = cy + r * LINE_BASELINES[i]
+            telemetryLineY[i] = cy + r * lineBaselines()[i]
         }
 
-        batteryLineY = cy + r * BATTERY_BASELINE
+        batteryLineY = cy + r * batteryBaseline()
         batteryTextSize = r * BATTERY_TEXT_SIZE
         statusTextSize = r * STATUS_TEXT_SIZE
         statusLineY = cy + r * STATUS_BASELINE
 
         sensorLineY = cy + r * SENSOR_BASELINE
-        sensorOffsetX = r * SENSOR_OFFSET_X
+        sensorOffsetX = r * sensorOffsetX()
         sensorTextSize = r * SENSOR_TEXT_SIZE
         sensorGlyphSize = r * SENSOR_TEXT_SIZE * SENSOR_GLYPH_RATIO
         sensorGlyphGap = r * SENSOR_GLYPH_GAP
@@ -435,6 +488,32 @@ class Geometry {
         private const val TICK_CARDINAL_OUTER = 0.905f
 
         private const val LABEL_RADIUS = 0.680f
+
+        /**
+         * The wellness face's three rings, under the hour hand's point: pulse outermost — where
+         * the tip runs, so the hand marks the hour on the ring that changes fastest — then
+         * activity, then sleep. Widths and gaps are held by `VitalTrackTest` against the tip
+         * (0.620 r), the numerals (0.632 r) and the readout inside them; the readout on this
+         * face is drawn close to the hub precisely to leave this band clear.
+         */
+        const val PULSE_RING_RADIUS = 0.606f
+        const val ACTIVITY_RING_RADIUS = 0.570f
+        const val SLEEP_RING_RADIUS = 0.534f
+        const val VITAL_RING_WIDTH = 0.022f
+
+        /**
+         * Calendar spans ride the outer edge of the daylight band — inside it, so the band still
+         * reads as one thing, and out of the way of the sun and moon marks that sit on its
+         * middle. The alarm is a notch across the band's whole cross-section, the same idiom the
+         * incident marks use on the duty arc: a crossing line is the one mark that cannot be
+         * mistaken for more band.
+         */
+        const val EVENT_TRACK_RADIUS = 0.893f
+        const val EVENT_WIDTH = 0.016f
+        const val ALARM_STROKE = 0.016f
+
+        /** The hour hand's tip, as a fraction of the radius; the trail must stay under it. */
+        const val HOUR_HAND_TIP = 0.620f
 
         /** The duty arc rides on the inner circle the hour ticks spring from. */
         const val DUTY_ARC_RADIUS = 0.760f
@@ -501,6 +580,24 @@ class Geometry {
          * being true.
          */
         internal const val BATTERY_BASELINE = 0.520f
+
+        /**
+         * The wellness face's own baselines. Everything is pulled in toward the hub — the score
+         * where the duty row sat, then zulu, then the two figures that used to live at the foot
+         * of the dial — because the band from 0.523 r out to the hour hand's tip now belongs to
+         * the three rings, and a readout that reached into it would be read through them.
+         */
+        internal val VITAL_LINE_BASELINES =
+            floatArrayOf(-0.360f, -0.160f, 0.215f, 0.330f)
+
+        internal const val VITAL_BATTERY_BASELINE = 0.255f
+
+        /**
+         * And the slots come in with them. On the duty face they sit at 0.364 r, which is the
+         * widest the hub's own line can carry; here the sleep ring runs at 0.534 r and a slot
+         * reading `QFE 1013` would have been drawn straight through it.
+         */
+        internal const val VITAL_SENSOR_OFFSET_X = 0.300f
 
         /** A step under the readout: it is a background figure, not one of the four data rows. */
         internal const val BATTERY_TEXT_SIZE = 0.086f

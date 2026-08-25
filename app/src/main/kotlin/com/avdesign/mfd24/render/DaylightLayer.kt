@@ -22,6 +22,11 @@ import kotlin.math.sin
  */
 class DaylightLayer {
 
+    private val alarmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.BUTT
+    }
+
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.BUTT
@@ -39,6 +44,48 @@ class DaylightLayer {
         paint.color = color
         paint.strokeWidth = g.daylightWidth
         canvas.drawArc(g.daylightTrack, startAngle - QUARTER_TURN, sweepAngle, false, paint)
+    }
+
+    /**
+     * Calendar spans: short arcs on the band's outer edge, saying that an hour is spoken for and
+     * nothing else. Overlapping events are drawn over one another on purpose — three meetings at
+     * ten are still just "ten is busy" to a dial, and a wearer who needs to know which opens the
+     * calendar.
+     */
+    fun drawEvents(
+        canvas: Canvas,
+        g: Geometry,
+        color: Int,
+        startAngles: FloatArray,
+        sweeps: FloatArray,
+        count: Int,
+    ) {
+        if (count == 0) return
+        paint.color = color
+        paint.strokeWidth = g.eventWidth
+        var i = 0
+        while (i < count) {
+            canvas.drawArc(g.eventTrack, startAngles[i] - QUARTER_TURN, sweeps[i], false, paint)
+            i++
+        }
+    }
+
+    /**
+     * The next alarm, as a notch across the band — the incident mark's own shape, because it is
+     * the same kind of statement: a single instant that has to be told apart from a span.
+     */
+    fun drawAlarm(canvas: Canvas, g: Geometry, color: Int, angle: Float) {
+        if (angle.isNaN()) return
+        alarmPaint.color = color
+        alarmPaint.strokeWidth = g.alarmStrokeWidth
+        val radians = Math.toRadians(angle.toDouble() - QUARTER_TURN)
+        val dx = cos(radians).toFloat()
+        val dy = sin(radians).toFloat()
+        canvas.drawLine(
+            g.cx + dx * g.alarmInnerRadius, g.cy + dy * g.alarmInnerRadius,
+            g.cx + dx * g.alarmOuterRadius, g.cy + dy * g.alarmOuterRadius,
+            alarmPaint,
+        )
     }
 
     /**

@@ -8,67 +8,25 @@ them. Assume the README has been read.
 
 ## Where things stand
 
-Last updated 2026-08-22, on `main` at **2.7.0** (`versionCode` 19), which is also what is published.
-`main` sitting ahead of the release is the normal state between publishes — see **Releasing**.
+Last updated 2026-08-28. Three faces, three branches, three releases; the working branch is
+`vital`.
 
-**The product split.** The multitool became one focused product: one face, one audience. The
-celestial-body switch, its option labels and the two reserved build flavors are all **gone from the
-repository** as of 2026-08-22 — a placeholder flavor named after an unshipped product is a roadmap
-for whoever forks first, and this repository is public. **Anything unshipped is discussed
-off-repo**; the surprise is the asset. What stays is engine, not announcement: the general
-time-base arithmetic in `astro/` and the `PlanetMode` parameter the render path takes, fixed to
-Earth by a `val` in `MfdRenderer` that nothing writes. A deeper cut — collapsing those parameters
-out of the layers and the palette — is available if the dex is ever worth it, but it buys nothing a
-reader of the repository can see. The earlier multitool releases were removed from GitHub as part of the
-repositioning; their tags remain. Settings reset on update: the schema changed five times since 1.4.0
-(AMBIENT AUTO, SOLAR_MARK, the removed PLANET, LUNAR_MARK, SOS_SOUND + LOG_HEART_RATE).
+| Face | Branch | Published | On the watch | Unreleased work on the branch |
+|---|---|---|---|---|
+| MFD-24 (duty) | `main` | `v2.7.0` (`versionCode` 19) | 2.7.0, the published binary | the always-on sensor gate (`bb521ba`) |
+| MFD-24-Mars | `mars` | `mars-v0.1.0` | 0.1.0 | the same gate (`d4f302b`) |
+| MFD-24-Vital | `vital` | `vital-v0.1.4` | **0.1.5**, ahead of the release | the graphs pass, `TRACK SLEEP`, the ring seam |
 
-- **Released:** v2.7.0 on GitHub (`versionCode` 19), signed with the release key — same certificate
-  as every release since 1.0.0, so it installs over any earlier build. It is the **only release on
-  the page** and `v2.7.0` is now the **only tag in the repository**, which is the standing policy:
-  one release, and no tag pointing at history that is no longer on a branch. 2.7.0 is the
-  Earth-only pass — the placeholder flavors and the celestial-body setting removed, steps taken
-  from the platform's own daily total with our count as the fallback, the APK down from 4.35 MB to
-  3.54 MB, and the documentation re-verified against the code. **Schema change** (the removed
-  celestial-body setting was already absent from this flavor's schema, but the settings list moved
-  again), so warn about a settings reset. Bump both version fields before the next publish.
-- **`main` is one commit, and it is the only branch.** The whole history was collapsed on
-  2026-08-22 at the user's request, so nothing of the development is public: one commit
-  (`ec9c4cd "MFD-24 2.7.0"` at the time of writing — amending it moves the sha, which is normal),
-  one tag, one release. `earth` was deleted the same day: it had become a byte-identical copy of
-  `main`, and two branches showing the same tree only raise the question "which one is the release
-  built from". The pre-collapse history is kept **locally only**, on `pre-squash-2026-08-22`
-  (tip `120654d`), where the old tags v1.2.0…v2.6.1 still resolve; `video-demo` still stands, and
-  neither is ever pushed. From here on a release *is* a commit: squash the work, tag it, publish
-  it. Amending is the way to correct one — never a second commit on top.
-- **2.7.0 is verified on the watch** (2026-08-22, TicWatch Pro 3 Ultra): installed from the staged
-  APK, face renders with a live watch under way, `logcat` clean of exceptions and of `denied` for
-  our package, the editor opens, and `DISPLAY` now begins at `LUME PALETTE` with no celestial-body
-  row. The accordion's pin was seen doing the right thing on hardware for the first time: opening
-  `DISPLAY` left its header exactly where the finger found it, with the revealed rows below the
-  fold. Also verified on the API 30 emulator beforehand, which is the cheap gate — install the
-  **release** APK there and read `logcat` before touching the watch.
-- **Docs re-verified against the code on 2026-08-22**, by reading `docs/DESIGN.md` line by line
-  against what the classes actually do. Sixteen statements were wrong, and they were wrong in one
-  particular way worth knowing: **the *reason* survives while the behaviour is inverted.** The
-  accordion was documented as scrolling the opened section into view (it now pins the header
-  instead), a served watch as keeping its arc until the next one replaced it (it retires after an
-  hour), steps as needing a baseline (that is now the fallback), Open-Meteo as *the* weather source
-  (METAR is, where there is one). Each of those paragraphs still argued its case fluently, which is
-  exactly why nobody noticed. So: **when a behaviour is inverted, grep the docs for the old
-  argument, not for the old words.** Counts drift the same way — 177 tests, 96 ticks, 5229 airports
-  were all off by a little.
-- **The translations are pitch pages, not mirrors.** `docs/i18n/README.*.md` are 48–66 lines against
-  the English README's 192: they carry the pitch, the essentials, install and licence, and have
-  never carried the permission table, the settings table or the footnotes. The six-language rule
-  therefore means *carry a change into whatever a translation actually contains* — a new footnote in
-  the English README needs nothing done to them, a changed claim about what the face does needs all
-  six. `docs/INSTALL.md` and its five translations **are** true mirrors; keep them that way.
-- **Docs refreshed 2026-08-21, after 2.1.0:** all screenshots re-taken on the API 30 emulator
-  (green palette, manual position Kyiv 50.40/30.45 injected into `mfd24_telemetry.xml`, shift and
-  incident states injected into their prefs, night forced with `auto_time 0` + `date -u`;
-  `tapagain.png` retired as unreferenced). `docs/INSTALL.md` plus five translations under
-  `docs/i18n/` carry the three install routes and the no-Google-Play rationale.
+**Version fields move once per publish, not once per commit**, so a branch sitting ahead of its
+release is the normal state. `main` and `mars` carry one fix each and keep their released version
+numbers; `vital` was bumped through 0.1.0…0.1.5 in two days because each of those *was* published
+and withdrawn, which is what the release policy says to do rather than replacing bytes under a
+number somebody already has.
+
+**Withdrawn deliberately:** `vital-v0.1.0`, `0.1.1`, `0.1.2` and `0.1.3` — each replaced within
+hours by the next, release object and tag deleted through the API. The reasons are worth keeping,
+because they are the same reason: the daylight band grew four weights and stopped saying where the
+day was (see the band entry in the invariants).
 
 - **The README was cut from 1022 lines to ~155 on 2026-08-22**, and the deep half moved to
   `docs/DESIGN.md` (layout, how it works, the full settings reference, the dial's degraded states,
@@ -166,14 +124,135 @@ repositioning; their tags remain. Settings reset on update: the schema changed f
   `DOUBLE_TAP_MILLIS` apart because each spawns its own JVM; running them inside one `adb shell` loop
   (`for i in 1 2 3; do input touchscreen tap X Y; input touchscreen tap X Y; sleep 2; done`) lands it.
 
+## The vital branch (local)
+
+A third face on the same tree: `vital` flavor, `com.avdesign.mfd24.vital`, "MFD-24-Vital",
+installs beside the duty face. Branched off `main`, not merged with `mars` — the two share only
+the idioms. Off by default and opt-in throughout, because it runs a service and an LED.
+
+**What it is.** The day on three rings at the hour hand's point (pulse, activity, sleep — hue
+*and* stroke weight, so the palette can stay calm), a score above the hub, a double tap to the
+report, and a `GRAPHS` row in the recorder section for the three records drawn across a screen.
+The daylight band gained hourly cloud shading, twilight wedges, the next alarm as a notch and
+calendar hours as arcs on its outer edge. Duty arc and vigilance work exactly as on the duty
+face; only the standing `MAN DOWN` text is dropped there.
+
+Facts paid for on hardware or in review, all now in code and tests:
+
+- **The first step-counter read is a baseline and contributes nothing.** The recorder's very
+  first tick on the watch reported the whole counter since boot — twelve thousand steps painted
+  onto one quarter-hour. `DayBins.stepDelta` returns zero with no previous reading; a counter
+  *below* its last value still returns the counter, because those steps happened after the reboot.
+- **The hour sunrise falls in was being dropped.** The per-hour band shading kept an hour only
+  when its *start* fell inside the daylight span — true of every hour but the one containing
+  sunrise. Seen on the wrist as a dark notch at 06–07; the clipping now lives in `BandClip`,
+  pure and tested.
+- **Only the next alarm is reachable.** `getNextAlarmClock` gives one alarm, no permission; the
+  full list belongs to whichever clock app set it and is exposed to nobody. The mark drops itself
+  once fired, and anything past a day is not drawn — on a 24-hour dial it would sit at the hour
+  of an alarm set for tonight.
+- **`run-as` is unavailable on the release build**, so the day log cannot be read off the watch
+  by hand; verify through the face, the report and the graphs instead.
+- **A double tap cannot be scripted as two `input tap` calls** (each spawns a JVM): use one
+  `adb shell` with both taps, the same trap the incident-clear gesture documents.
+
+Doze shapes the whole recorder: 15-minute bins, inexact `setAndAllowWhileIdle` (vigilance owns
+the app's exactness), and totals that survive lateness because every bin's steps are a difference
+of two cumulative readings. Sleep is inferred from worn + still + a pulse near the wearer's own
+floor, with the pulse confirming and never vetoing — the night is exactly when the platform
+thins the samples.
+
 ---
+
+## Reading the battery on the watch
+
+Everything below came out of one overnight run and settled an argument that could not be settled
+by reasoning about the code. Do this rather than estimating.
+
+```powershell
+# since the last full charge; the counters reset when the watch is unplugged at 100 %
+adb -s <dev> shell "dumpsys batterystats --charged | grep -E '^  (Time on battery|Screen on)'"
+adb -s <dev> shell "dumpsys batterystats --charged | grep -A 30 'Estimated power use'"
+adb -s <dev> shell "dumpsys batterystats --charged | grep -E 'Sensor [0-9]+' -B 2"
+adb -s <dev> shell "dumpsys sensorservice | head -8"      # what is running *now*, and how fast
+adb -s <dev> shell "pm list packages -U"                  # uid -> package, for the table above
+```
+
+**The run of 25–26 August 2026, vital face, always-on, recorder at 10 minutes.** 15 h 29 m on
+battery, 100 % → 77 % — **1.48 %/hour**, about 9 mA on a 580 mA·h cell, projecting to some 67
+hours. The screen was *interactive* for **eleven minutes** of that; the rest was ambient. Actual
+drain 133–139 mA·h against a computed 93.6, and the model's own breakdown:
+idle 66.6, unaccounted 39.8, system 7.4, screen 6.5, **the face itself 3.1** (cpu 1.5, sensors
+1.5). The recorder held `mfd24:vital` for 33 minutes across 111 ticks — its twenty-second pulse
+windows, stretched by Doze to about one every 8.4 minutes, exactly as designed.
+
+**The same measurement after the ambient gate, 26–28 August: 2 d 7 h 13 m on battery, 100 % → 27 %.**
+That is **1.32 %/hour** against 1.48, a projected 75.6 hours against 67, and about 7.7 mA against
+8.6. The sensor line is where the change actually shows: our heart-rate time fell from **15 h 25 m
+in 15.5 hours (99.6 % of the run) to 1 h 31 m in 55 hours (2.7 %)** — a duty cycle thirty-six times
+lower — across 411 activations of about thirteen seconds each, which is the recorder's windows plus
+the twenty-four minutes somebody spent looking at the watch. The recorder's own wake lock: 1 h 14 m
+over 244 ticks.
+
+**Eleven per cent of battery for thirty-six times less sensor is the honest headline**, and the
+gap between those two numbers is the lesson: the PPG's draw is not where the model puts it, the run
+lengths differ, and a wearer's day is not a controlled experiment. What is left in front of it is
+not ours — the system holds the light sensor for always-on brightness (1 d 18 h of the run) and the
+Wear app holds the off-body detector continuously. The remaining lever we own is the recorder
+interval: at fifteen minutes instead of ten the heart-rate time would fall by a third again.
+
+Three things to know when reading that dump:
+
+- **Sensor handles are decimal in `batterystats` and hex in `sensorservice`.** 100 is 0x64 heart
+  rate, 105 is 0x69 step counter, 108 is 0x6c the off-body detector, 1 is the accelerometer,
+  7 is the light sensor (the system holds it for always-on brightness).
+- **The power model does not know what the optical sensor costs on this watch.** The PPG runs
+  through the sensor hub, and its draw lands in `idle` and `unaccounted` rather than against the
+  uid holding it — which is why our face was blamed for 3.1 mA·h while holding the LED on for
+  fifteen hours. Do not read the per-uid table as the answer; read the sensor *times*.
+- **Nobody else was holding the heart-rate sensor.** Mobvoi's own continuous monitoring was not
+  running: every second of sensor 100 was ours. Worth checking before blaming the platform.
+
+## Verify an install by its hash, not by its version
+
+`com.avdesign.mfd24` reported 2.7.0 / `versionCode` 19 on the watch, matching the published
+release — and the binary was a *different build of the same version*, sha `ef515a13…` against the
+release's `df5ecb4a…`. Unzipping both showed 438 entries either side and four differing:
+`classes.dex` (a kilobyte larger), `resources.arsc`, `AndroidManifest.xml` and the baseline
+profile. The watch had a build made before the final amend of 2.7.0; nothing was wrong with it,
+and nothing said so either.
+
+```powershell
+$path = (adb -s <dev> shell "pm path <pkg>") -replace "package:",""
+adb -s <dev> shell "sha256sum $path"       # against the SHA-256 in the release notes
+```
+
+Cheap, and the only way to know that the thing being debugged is the thing that was published.
 
 ## Releasing
 
-**One release object, one tag, one commit.** As of 2026-08-22 the repository carries a single
-commit and a single tag, and each publish deletes the previous release object *and* its tag —
-because a tag is what keeps a collapsed history publicly reachable, which defeats the point of
-collapsing it. `git push origin :refs/tags/x` may be refused in this environment; the GitHub API
+**One release object, one tag, one commit — per face.** Each publish deletes the previous release
+object *and* its tag for **that face only**, because a tag is what keeps a collapsed history
+publicly reachable, which defeats the point of collapsing it.
+
+Three faces publish from one repository, and they are kept apart by two names that must agree:
+
+| Face | Branch | Tag | Asset | `UPDATE_TAG_PREFIX` |
+|---|---|---|---|---|
+| MFD-24 | `main` | `v2.7.0` | `app-earth-release.apk` | `v` |
+| MFD-24-Mars | `mars` | `mars-v0.1.0` | `app-mars-release.apk` | `mars-v` |
+| MFD-24-Vital | `vital` | `vital-v0.1.0` | `app-vital-release.apk` | `vital-v` |
+
+`ReleaseCheck` reads the release **list** and filters it by that pair — tag prefix *and* the asset
+this flavour expects — then takes the numerically highest version. `releases/latest` is never
+asked for: it is one release per *repository*, so whichever face published most recently would
+hide the others' updates for good. `ReleaseCheckTest` pins the crossings, including that the Earth
+prefix `v` is a prefix of `vital-v` as well and that the asset name is what separates them.
+
+**Publish every non-Earth release with `make_latest: false`.** The build in the field — Earth
+2.7.0 — still carries the old `releases/latest` updater, so a Mars or Vital release marked latest
+is the one it would ask about. The gap closes for good only when an Earth release ships with the
+list-based check; until then it is one flag on the create call. `git push origin :refs/tags/x` may be refused in this environment; the GitHub API
 (`DELETE /repos/{repo}/git/refs/tags/{tag}`) does it, and the publish script already carries that
 step alongside the release-object delete.
 
@@ -196,13 +275,20 @@ spending that on a polish commit teaches them to ignore the next one. Batch the 
 the next real change. The version fields move once per publish, not once per commit; `main` can sit
 ahead of the latest release for as long as it takes.
 
-## One repository, one main, one face
+## One repository, one branch per face
 
-`main` is the single truth and, since 2026-08-22, the **only** branch on the remote; work happens on
-short-lived branches off it (`video-demo` is the one standing exception — the film set, never
-merged, never pushed). Tags are `vX.Y.Z` and the `earth` flavor is the product. Deleting a remote
-branch is worth two assertions first, which is how `earth` went: that the default branch is the one
-being kept, and that the branch being deleted points at the same commit.
+`main` is the duty face and the default branch; `mars` and `vital` are the other two, each a single
+squashed commit off `main` carrying one whole face. They are **branches, not forks**: everything
+below `render/`, `astro/`, `geo/` and `text/` is shared, and a fix to the dial belongs on `main`
+first. None of the three is merged into another — the faces differ by flavour, not by history, and
+a merge would only produce a tree that builds all three from one branch for no one's benefit.
+
+`video-demo` is the standing exception: the film set, never merged and never pushed. The
+pre-squash histories (`pre-squash-2026-08-22`, `mars-pre-squash-2026-08-24`) are local-only
+insurance and stay that way.
+
+Deleting a remote branch is worth two assertions first, which is how `earth` went: that the default
+branch is the one being kept, and that the branch being deleted points at the same commit.
 
 **The flavor of one is deliberate.** A `world` dimension carrying a single `earth` flavor looks
 redundant, and removing it would rename every task and output path this project is written
@@ -262,6 +348,22 @@ adb -s emulator-5554 shell "service call alarm 3 s16 America/New_York"
 `getLastKnownLocation` still returns null, so a position change cannot be demonstrated on the
 emulator unless something is mid-`getCurrentLocation`. Time-zone changes work fine; position
 changes do not. Do not chase this — it is an emulator limitation, not a bug.
+
+**Starting the emulator, and driving screens that have no way in.**
+
+```powershell
+& "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" -avd Wear_OS_Large_Round -no-snapshot-load -no-boot-anim
+```
+
+With `adb root` on the emulator, `am start -n <pkg>/<activity>` **does** launch a non-exported
+activity, which is the only sane way to iterate on the report, the graphs and the export screens:
+the alternative is the long-press-and-pencil dance, which is flaky and lands on notifications about
+as often as on the editor. The same command is refused on the watch, where adbd is not root.
+
+Seeding the wellness face: `mfd24_vital` in device-protected prefs, keys `today` and `yesterday`
+holding the packed day (`DayLogCodec` grammar, `f:hr:steps` per bin), plus `recording`, `interval`,
+`midnight_up`, `midnight_24`, `sleep_offbody` and the two session instants. Write it, `chown` to
+the app's **current** uid — it changes on reinstall — and `am force-stop` in the same `adb shell`.
 
 ### Real watch — TicWatch Pro 3 Ultra GPS
 
@@ -479,11 +581,114 @@ path is verified (2.2.0 asked GitHub and printed "Up to date"); whether Mobvoi's
 the final commit cannot be known until the next release offers itself — the docs promise the
 install only "where the platform allows".
 
-**Nothing in the repository announces unshipped work.** The README's family box, the plan detail
-in these notes and the GitHub repository description all named faces that do not exist; all three
-are gone as of 2026-08-22. A roadmap in a public repo is a roadmap for whoever forks first, and the
-surprise is the asset. Unshipped work is discussed off-repo. The shared arithmetic in `astro/`
-stays where it is — engine, not announcement.
+**A face is announced when it is built, and not before.** The rule as first written — nothing in
+the repository names anything unshipped — came from a README family box, a plan in these notes and
+a repository description that all named faces which did not exist. That is still the thing being
+prevented: **a roadmap in a public repo is a roadmap for whoever forks first**, and a placeholder
+flavour named after an idea is the worst of it.
+
+What changed on 2026-08-25, at the user's direction, is what counts as unshipped. `mars` and
+`vital` are complete faces that build, test and run on the watch; both are pushed and both are
+described in the README. So the line is **working code, not intentions**: a face that exists on a
+branch and can be installed may be public, with its documentation and its screenshots; an idea, a
+plan, a reserved flavour or a name with nothing behind it stays off-repo. The shared arithmetic in
+`astro/` was always on the right side of that line — engine, not announcement.
+
+**The graphs screen shows the same twenty-four hours the rings do, and says so with hands.**
+Three decisions, each of which replaced something that had looked reasonable:
+
+- **The window rolls.** Midnight-to-midnight of today cut a night that began at nine in half —
+  somebody who went to bed early opened the graphs in the morning and found the sleep and the
+  evening pulse missing, which is what they had opened them for. It is now today up to the hand
+  and yesterday ahead of it, the same composition `VitalMonitor` publishes for the rings.
+- **Two schematic hands** at the hour and minute, through `AstroTime.hourHandAngle` and the
+  stored `DIAL TOP`, so the seam between today and yesterday is *where the hand points* and
+  nothing has to be counted round from midnight.
+- **One grammar for all three panels: a line.** Pulse was ninety-six marks (the eye joins them
+  wrongly at this size), activity was bars, sleep was banded arcs — three instruments on one
+  screen, and the first second of reading went on working out which was which. Now each panel
+  fills a radius-and-colour per quarter-hour and one renderer strokes a quadratic through each
+  point, from midpoint to midpoint, so the pieces meet tangentially and read as one stroke while
+  the colour still changes with the value.
+
+**What the line must never do is bridge a hole.** It is drawn only between two quarter-hours that
+were both measured, and it breaks again at the seam, where adjacent array entries are a day apart.
+That is the same rule the separate marks were protecting, and it is the reason the platform's thin
+hours still read as absence. A sampled quarter-hour with a value of zero is *not* a hole — on the
+activity panel it sits on the inner circle, because it is a measurement.
+
+**The pulse axis is the day's own range, on a logarithm.** Fixed 40–150 had both faults at once: a
+quiet day flattened into a circle using a fifth of the panel, and a run at 170 was *clamped* — the
+peak pressed against the rim, the graph lying about the one moment anybody would look for. The
+ends now come from the day with four beats of air either side, a floor of 25 beats of span so
+sensor noise cannot look like a day, and the mapping is logarithmic because a pulse is a ratio:
+50→60 deserves the same distance as 100→120. A guide circle outside the day's range is not drawn
+at all — the empty 120 ring was two thirds of the panel on a quiet day and it was what pushed the
+line into the middle.
+
+**The rings leave half an hour clear ahead of the hand.** `TRAIL_SKIP_BINS` = 2, wrapping past
+midnight, applied to all three rings by `ActivityTrailLayer`'s skip window. The rings carry a
+rolling twenty-four hours, so without a seam the arc runs straight past the hand's tip into
+yesterday's quarter-hours and nothing on a full circle says which end is now. Drawn as absence
+rather than as a mark, because absence is the one thing these rings already mean.
+
+**A declared night is the model's one input that is not a measurement.** `TRACK SLEEP` in the
+recorder section writes two instants into `VitalStore`, and `SleepModel` reads them as bin indices
+of the pair (`DayBins.pairBin`, `VitalStore.sleepSessionBins` — one converter, because the face,
+the report and the graphs must agree on which night is which). Inside a session the night window
+stops applying, the opening threshold relaxes to `QUIET_MAX_STEPS`, and off-body stillness counts
+whether or not the standing switch is on. It exists because two pairs of cases are identical to a
+wrist and obvious to a wearer: a film on the sofa against an early night, and a bedside table
+against an empty room. Sixteen hours caps a session nobody closed.
+
+**The sleep model was tuned against one real night, and the raw export is why that was
+possible.** 25 August 2026: the wearer was in bed midnight to 07:30 and the report said
+`Slept 1:30, 2 wakes`. Three separate faults, none of which could be seen from the report and all
+of which were obvious in the grid once `EXPORT RAW` could put it on a desk — scan the QR with
+`pyzbar`, pipe it through `tools/vital/decode_day.py`, read the CSV:
+
+- the pulse ceiling sat at resting + 10 % (69 bpm against a resting 63) and vetoed ordinary light
+  sleep in the seventies. Now `AWAKE_MARGIN_PCT` is 45.
+- `QUIET_MAX_STEPS` was 20, and quarter-hours carrying 22, 41 and 43 steps — an arm under a duvet —
+  ended the night three times. Now 60; a real trip out of bed is a hundred and more.
+- **a quarter-hour nobody watched was charged to the wearer as fifteen minutes out of bed.** Four
+  dozed-through samples became four wakings and an hour off the total. Bridged bins now count
+  toward the time awake only if they were actually sampled, which is what the KDoc claimed all
+  along.
+
+Two more followed from a **staged** day rather than a real one, which is the argument for keeping
+a believable seed around: a quiet evening at sixty steps a quarter-hour opened a night at eight in
+the evening and ran it to morning, and a sedentary desk morning came back as ninety minutes of nap
+drawn in the deep band. So a run now *begins* on `QUIET_START_STEPS` (20) and only *continues* on
+`QUIET_MAX_STEPS` (60); outside the night window a candidate needs a real reading within
+`NAP_MARGIN_PCT` (15 %) of the floor; and the loose night rule applies to a *new* run only inside
+`SLEEP_START_TO_MINUTES` (06:00), so a night that runs to half past nine keeps it while a Tuesday
+morning does not.
+
+After all three of the first set: `Slept 8:00, 1 wake` against a true 7:30. The half-hour over is the far edge —
+a still, quiet hour after waking reads as more sleep — and it is the deliberate side to be wrong
+on. `the night of 25 August, as the watch actually recorded it` keeps the whole grid as a test.
+
+**Anything drawn outside the face has to be told the face's orientation.** The graphs, the
+report and the export are plain activities with no `EditorSession` and no style of their own, so
+the renderer publishes `DIAL TOP`, the midnight label and the off-wrist switch into `VitalStore`
+from `applyStyle` (through `onVitalStyle`, since a `Renderer` has no Context). A round graph drawn
+midnight-up beside a dial drawn noon-up is one the reader has to flip in their head, and it looks
+like a bug in the data rather than a difference of convention.
+
+**The ring's leading edge is painted from the live reading, not from the last written bin.**
+`MfdRenderer` overwrites the current bin's pulse and activity colours each frame when there is a
+heart rate on the dial, and restores that bin from the record when the reading goes away
+(`liveBin`). Without it the tip of the ring is a faint placeholder until the quarter-hour closes,
+while the pictogram beside it is bright coral — and the pictogram's whole job is to say *this
+number is that colour*.
+
+**Sizes for the raw export, measured rather than guessed** (`RawDayCodecTest`): 388 bytes a day
+fixed, ~180 deflated, ~240 as Base64, ~280 as a whole packet. Two days fit one QR code with room
+over; a week is ~1.1 kB against the encoder's 858-byte ceiling, which is why the chip offers two
+days and not everything. A bespoke delta-and-run encoding was written and thrown away — it beat
+deflate by a few dozen bytes and needed a decoder nobody else has, where deflate is
+`zlib.decompress` everywhere.
 
 **A stored finding must be re-tested against the build reading it.** `UpdateStore.pendingVersion`
 filters through `ReleaseCheck.offerable`, which returns nothing unless the stored version is
@@ -513,6 +718,15 @@ notification per release; and `ABOUT → RELEASES` names the version and opens `
 — the release page as a QR, the same idiom the incident log leaves by. The notes live on that page,
 in a browser, at a readable size. Two seconds with a phone beat two minutes of scrolling a wall of
 text on a 1.2-inch screen, which is what the old screen was.
+
+**Declare scratch fields above the `init` block that uses them.** Kotlin runs initialisers in
+source order: `VitalMonitor.init` calls `republish`, so an array declared *after* the init block is
+still null on the first publication. On a debug build that is a `NullPointerException` with a
+readable name; on a release build it arrives as
+`Parameter specified as non-null is null: method c2.L.b, parameter out` and takes the watch face
+and the recorder down at start — the face cannot even be selected. Cost one install to find,
+2026-08-26, and it is the second entry in these notes whose lesson is *the release APK on the
+watch is the only gate that counts*.
 
 **A release build is the only place minification bugs live.** Selecting the steps slot crashed the
 face on the watch while every emulator check passed, because debug builds are not minified. R8
@@ -723,7 +937,17 @@ receiver registered in `onCreate` therefore leaked a dispatcher per preview, whi
 reports as `IntentReceiverLeaked` against `WatchFaceControlService`. Anything else registered for the
 life of the face has the same trap.
 
-**The sensor slots run only while the screen is on.** `SensorSlots.configure` is driven from
+**The sensor slots run only while the screen is on — and always-on does not count.**
+`watchState.isVisible` stays true in ambient: the face is on the screen, dimmed, once a minute.
+Gating the slots on visibility alone left the heart-rate LED lit around the clock, and the watch
+said so plainly — `dumpsys batterystats` blamed our uid for **15 h 25 m of sensor 0x64 out of
+15 h 29 m on battery**, with the screen interactive for eleven minutes of it, and
+`dumpsys sensorservice` showed the PPG running at 66.7 ms. The gate is now
+`isVisible && !isAmbient`, in both the style callback and the collector. When reading that dump:
+batterystats prints sensor handles in decimal, `sensorservice` in hex — 100 is 0x64 heart rate,
+105 is 0x69 step counter, 108 is 0x6c the off-body detector.
+
+**The original rule, which the above is the correct expression of:** `SensorSlots.configure` is driven from
 `MfdWatchFaceService`, from both the style (via `onSensorSlots`, reported on a change only) and
 `watchState.isVisible`. Heart rate is an LED against the wrist, so a frame must never be able to
 switch it on and a headless preview must not either — the callback is a no-op for headless
@@ -839,6 +1063,24 @@ verified against the live API. The cache still ages from the fetch, not the obse
 is up to an hour old at issue, and a cache keyed to obsTime would refetch on every screen-on for
 the back half of every hour. `MetarClientTest` pins the parse and the refusals against a real
 KJFK payload.
+
+**The daylight band is one arc and one weight: sunrise to sunset, and nothing else on it.** It
+reached four weights and came back to one, over two days and three cuts, and the sequence is worth
+keeping because each addition was defensible on its own:
+
+- *hour-by-hour cloud shading* — an overcast Kyiv afternoon came out level with its own dusk
+  (measured at the band radius, green channel 48 for 15:00 against 47 for 20:00). Cut with
+  `render/BandClip.kt`, `render/BandShade.kt` and `DaylightLayer.drawSegmented`.
+- *a civil and an astronomical wedge either side* — collapsed to one astronomical wedge, then cut
+  entirely on 2026-08-25 at the user's word. The measurement that preceded the cut had them at
+  exactly the right instants: drawn 03:57–05:57 and 20:01–22:08 against a computed 03:54 and 22:07,
+  with the day 05:57–20:01 against a sunrise of 06:01. **Being right was not the question.**
+- with the wedges went `setTwilight`, the four state fields, `Palette.twilightBand` and two of the
+  three `SolarTime` passes per refresh.
+
+The rule that came out of it: **the band says where the day begins and ends, and a reader glancing
+at a wrist has to get that in one look.** Anything else drawn on the ring is one more thing to rule
+out first, however true it is. The duty face never shaded anything and was legible throughout.
 
 **The sky marks sit at hour angles, never at clock hours — and never ease.** The first solar
 mark rode the daylight band as a fraction, which is algebraically the clock hour: exactly under

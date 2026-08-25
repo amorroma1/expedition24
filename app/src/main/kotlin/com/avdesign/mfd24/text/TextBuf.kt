@@ -115,6 +115,16 @@ class TextBuf(capacity: Int) {
         val LIT_MTC: CharArray = "MTC ".toCharArray()
         val LIT_LTC: CharArray = "LTC ".toCharArray()
         val LIT_LUNAR_DAY: CharArray = "LUNAR DAY ".toCharArray()
+        /** The wellness face's rows: last night's sleep, the day's score, resting pulse, steps. */
+        val LIT_SLP: CharArray = "SLP ".toCharArray()
+        /**
+         * The day's standing out of a hundred. Spelled `SCORE` rather than `DAY`, which read as
+         * a count of something — the first person to see it asked whether it was the steps.
+         */
+        val LIT_SCORE: CharArray = "SCORE ".toCharArray()
+        val LIT_RHR: CharArray = " RHR ".toCharArray()
+        val LIT_STP: CharArray = "STP ".toCharArray()
+
         val LIT_QNH: CharArray = "Q".toCharArray()
         val LIT_KM: CharArray = "KM".toCharArray()
 

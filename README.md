@@ -5,8 +5,11 @@
 **English** · [Français](docs/i18n/README.fr.md) · [Deutsch](docs/i18n/README.de.md) · [Italiano](docs/i18n/README.it.md) · [日本語](docs/i18n/README.ja.md) · [中文](docs/i18n/README.zh.md)
 
 A 24-hour instrument dial for people who stand watches — pilots, mariners, UAV crews, duty
-officers. One turn of the hour hand per day, your shift drawn as an arc of that day, a dead-man's
-monitor that escalates to SOS and leaves a record, and the telemetry a watch actually runs on.
+officers. Its sibling **MFD-24-Vital** turns the same dial on the wearer: a day of pulse, steps
+and sleep drawn where the hour hand's tip runs. Both install side by side.
+
+One turn of the hour hand per day, your shift drawn as an arc of that day, a dead-man's monitor
+that escalates to SOS and leaves a record, and the telemetry a watch actually runs on.
 
 Everything works offline except the weather. No companion app, no account, no analytics. GPL.
 
@@ -94,6 +97,7 @@ cannot raise a dialog itself.
 | `BODY_SENSORS` | the heart-rate slot and the pulse in an incident | dashes; the `LOG PULSE` row is not offered |
 | `ACTIVITY_RECOGNITION` | the steps slot; on Wear 5+ also what lets the vigilance service start | dashes; on newer Wear, no vigilance |
 | `POST_NOTIFICATIONS` | the monitor's ongoing notice, and the once-per-release update notice | the monitor runs unannounced |
+| `READ_CALENDAR` | **Vital only:** the hours the calendar has claimed, marked on the daylight band | that row is not offered; nothing else changes |
 
 No contacts, no storage, and no network beyond those calls. A hand-typed position replaces location
 entirely — see **Position** in the settings.
@@ -129,6 +133,121 @@ open one is outlined.
 | Mid-watch: the arc is the shift, the bright part is what is left to serve. | `ALWAYS-ON > AUTO` thins the face after sunset — half the light, half the burn-in duty cycle. | A running watch keeps the full face all night: a night duty is exactly when the dial is read in the dark. |
 
 **[How it works — layout, astronomy, the vigilance state machine, the tests →](docs/DESIGN.md)**
+
+## MFD-24-Vital
+
+The same dial, turned on the wearer instead of the watch: a separate face that installs **beside**
+MFD-24 and spends its twenty-four hours describing a day rather than a shift. Built for looking at
+in the morning and deciding what to do differently — not for counting, and not for grading.
+
+| The day, three rings deep | The day read back |
+|---|---|
+| ![](docs/screenshots/vital.png) | ![](docs/screenshots/vital-report.png) |
+
+*A staged day on the emulator, so the rings have something to show: a night, a walk to work, a
+sedentary morning, a lunchtime walk, an evening run. The hour hand's tip runs on the outermost of
+the three rings; behind it is the day already lived.*
+
+| | |
+|---|---|
+| **Three rings at the hand's point** | Pulse outermost, then activity, then sleep. Each quarter-hour states its value twice — in the hue and in the **weight of the line** — because colour alone has to shout to be read at a glance, and a dial that shouts all day is one you stop looking at. Pulse runs maroon → coral → rose by rate; activity deep green → phosphor by effort, which is the greater of what the feet did and what the heart did, so a hard half-hour that takes no steps still shows; sleep is one amber whose depth is brightness alone. |
+| **The ring's leading edge is live** | Half an hour of ring ahead of the hand is left clear, so the arc has a seam where *now* is — the rings carry a rolling twenty-four hours, and without it the day runs straight past the hand's tip into yesterday. The quarter-hour under the hand is painted from the reading on the dial rather than from the last one the recorder closed — and the pictograms beside the hub wear those same two colours. The heart is the colour of the arc under the hand and the walking figure the colour of the activity ring, which is the shortest legend available: you learn the scale from a number you already read. |
+| **Gaps mean gaps** | A quarter-hour nobody watched is drawn as nothing. "The watch was off" and "you did not move" are different claims, and the face never blurs them — which is also why an unmeasured day shows dashes rather than zeroes. |
+| **The day's score, and what to change** | `SCORE 85` above the hub; a double tap opens the report — the score, up to three things worth changing tomorrow, and the figures they came from. Steps and sleep carry forty points each because they are what tomorrow can be different about; the pulse carries twenty. |
+| **The band says when** | One arc for the day, sunrise to sunset, exactly as the duty face draws it — one weight and nothing painted inside it. It has carried more: cloud shading hour by hour, then twilight wedges either side, and each addition cost the band a little of the one thing it is for. On top of it, the next alarm as a notch — the one the platform will actually ring, dropped the moment it has fired — and the hours the calendar has claimed, as short arcs on the outer edge. |
+| **The watch timer and the monitor stay** | A wellness face still stands watches: the duty arc, the vigilance escalation and the incident record work exactly as they do on MFD-24. What is gone is the standing `MAN DOWN` across the dial — the hub's accent and the log carry it instead. |
+
+### Reading the day back
+
+![](docs/screenshots/vital-graphs.png)
+
+*Pulse, effort and sleep, from the same staged day: the night low and to the left of midnight, the
+walk to work and the evening run standing out to the rim, the night again as one amber run.*
+
+`RECORDER → GRAPHS` draws the three records the way the dial draws them — round, a mark every
+quarter-hour, in the face's **own** orientation and with its own name for midnight, over the
+**same rolling twenty-four hours the rings carry**: today up to the hand, then yesterday ahead
+of it. Midnight to midnight would cut a night that began at nine in half, and last night is
+most of what somebody opens these for. Two schematic hands sit over each dial at the hour and
+minute the face is showing, so the seam between today and yesterday is where the hand points
+and nothing has to be counted round from midnight. The circles are the scale: 45, 60, 90 and 120 bpm
+plus the wearer's own resting rate on the pulse dial, quarters of the day's effort on the activity
+dial, three depths on the sleep dial.
+
+The pulse is drawn as a **smoothed line**, coloured by the zone each reading falls in, on a
+**logarithmic axis whose ends come from the day itself**. Logarithmic because a pulse is a ratio —
+fifty to sixty is the same distance as a hundred to a hundred and twenty — and from the day because
+a fixed axis has both faults at once: a quiet day flattens into a circle, and a hard one gets its
+peak clamped against the rim, which is a graph lying about the one moment anybody looked for. A
+guide circle outside the day's range is not drawn.
+
+All three are drawn the same way, and that is deliberate: three panels in three grammars cost the
+reader a second of working out which is which before they can read anything. Effort runs from the
+inner circle out, sleep through its three depths, and a quarter-hour that was watched and found
+still sits on the floor rather than leaving a hole.
+
+The line breaks wherever the record does. It is only drawn between two quarter-hours that were both
+measured, so the platform's thin hours stay holes rather than an invented heartbeat, and it breaks
+again at the seam where today meets yesterday.
+
+**Sleep, inferred honestly.** From a wrist that is worn, still, and running a pulse in the range
+its own floor allows — the floor being the tenth percentile of the day's own readings, so the
+athlete resting at 45 and the smoker resting at 78 each get their own bar. Four rules, each put
+there by a night the model got wrong:
+
+- **The pulse only ever says *awake*,** and only when it is well clear of that floor. A
+  quarter-hour with no reading is still a candidate, because the platform thins the night's
+  samples exactly when it idles hardest. Getting this backwards turned seven and a half hours in
+  bed into an hour and a half in pieces.
+- **A night *begins* on a genuinely still quarter-hour and *continues* through movement.** Sixty
+  steps under a duvet is a body asleep; sixty steps on a sofa is an evening, and without the
+  distinction one opened a night at eight in the evening and ran it to morning.
+- **A quarter-hour nobody watched is bridged, not charged to the wearer.** It neither ends the
+  night nor counts as time spent out of bed.
+- **By day the bar is higher.** A nap has to run within a sixth of the floor and has to have a
+  reading at all — otherwise a sedentary morning at a desk comes back as ninety minutes of sleep.
+
+What it costs is the far edge: a still, quiet hour after waking can be read as another half-hour of
+sleep. That is the deliberate side to be wrong on. Quarter-hour edges, no naps under half an hour,
+no phases beyond three depths of brightness, and no claim whatever to be a sleep study.
+
+**A night you can declare.** `RECORDER → TRACK SLEEP`: one tap going to bed, another getting up.
+Inside a declared night the model stops second-guessing — an evening at nine counts, a turn of the
+wrist does not end it, and a watch left on the bedside table is read as sleep. It is there because
+the two cases a wrist cannot settle are settled by the wearer in one tap: an evening on the sofa
+and an early night look identical from a watch, and so do a bedside table and an empty room.
+Sixteen hours and the session closes itself, so a forgotten tap costs a morning rather than a day.
+
+**Sleep off the wrist, if asked.** A watch spent on the bedside charger can still be read as a
+night — `RECORDER → SLEEP OFF WRIST`, off by default. Off a wrist there is no pulse and no phases,
+only the fact that nothing moved, so the claim is confined to the night hours and to stretches of
+two hours and more, and a watch face down on a desk over lunch gets nothing. It is the weakest
+reading this face makes, and it exists because somebody who charges overnight otherwise gets a
+blank.
+
+**The record leaves whole.** `RECORDER → EXPORT RAW` puts two days of the grid itself — every
+quarter-hour's flags, pulse and steps, nothing inferred — on the screen as a QR code and out of the
+speaker as 1200-baud tones: 388 bytes a day fixed, about 180 deflated, which is why two days fit one
+code and a week does not. `tools/vital/decode_day.py` turns either channel back into a CSV. It
+exists so that when a night comes back wrong the argument can be had against the numbers rather
+than against a screenshot of a conclusion — every rule above was settled that way.
+
+**What it costs, and what it does not do.** Recording is **off by default**: it runs a foreground
+service for the life of the day and lights the optical LED for about twenty seconds every five, ten
+or fifteen minutes, which is a thing to be asked for rather than assumed. Steps come from the
+hardware counter, so they cost nothing, and the quarter-hours are timed by inexact alarms that let
+the watch sleep — Doze can stretch a tick to nine minutes and the totals still come out exact,
+because every bin is the difference of two cumulative readings. Nothing is uploaded anywhere: no
+account, no companion app, and no network call in any of this beyond the same forecast the duty
+face fetches. And nothing here is a medical instrument — the strongest thing it will ever say is
+that a pattern has held for three days and a doctor might want to hear about it.
+
+**What this face drops from MFD-24**, because a day is not a watch: the weather row and its unit
+settings (the forecast survives only as the band's shading), the 5 km site lock and the whole
+on-device site index, and the duty and incident *text* rows — the arc and the record remain.
+
+Build it from the same tree — `./gradlew :app:assembleVitalRelease` produces `app-vital-release.apk`
+— and sideload it exactly like the Earth face.
 
 <details>
 <summary><b>Footnotes — the step count, the hardware it needs, and what it weighs</b></summary>
@@ -180,7 +299,9 @@ cd expedition24
 ./gradlew :app:assembleEarthDebug
 ```
 
-JDK 17+ and the Android SDK. 178 JVM tests: `./gradlew :app:testEarthDebugUnitTest`.
+JDK 17+ and the Android SDK. Two flavors share the tree — `assembleEarthRelease` and
+`assembleVitalRelease` — and each has its own test task:
+`./gradlew :app:testEarthDebugUnitTest :app:testVitalDebugUnitTest`.
 
 ## Licence
 

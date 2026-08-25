@@ -38,6 +38,13 @@ object StyleSchema {
     val AMBIENT_DENSITY: UserStyleSetting.Id = UserStyleSetting.Id("ambient_density")
     val SENSOR_LEFT: UserStyleSetting.Id = UserStyleSetting.Id("sensor_left")
     val SENSOR_RIGHT: UserStyleSetting.Id = UserStyleSetting.Id("sensor_right")
+    val ALARM_MARK: UserStyleSetting.Id = UserStyleSetting.Id("alarm_mark")
+    val CALENDAR_MARKS: UserStyleSetting.Id = UserStyleSetting.Id("calendar_marks")
+    val RECORD: UserStyleSetting.Id = UserStyleSetting.Id("vital_record")
+    val RECORD_INTERVAL: UserStyleSetting.Id = UserStyleSetting.Id("vital_interval")
+
+    /** Whether sleep may be read from a watch that spent the night off the wrist. */
+    val SLEEP_OFFBODY: UserStyleSetting.Id = UserStyleSetting.Id("vital_sleep_offbody")
 
     const val TEMP_CELSIUS: String = "c"
     const val TEMP_FAHRENHEIT: String = "f"
@@ -87,6 +94,23 @@ object StyleSchema {
     const val LOG_HR_OFF: String = "off"
     const val LOG_HR_ON: String = "on"
 
+    const val ALARM_OFF: String = "off"
+    const val ALARM_ON: String = "on"
+
+    const val CALENDAR_OFF: String = "off"
+    const val CALENDAR_ON: String = "on"
+
+    const val RECORD_OFF: String = "off"
+    const val RECORD_ON: String = "on"
+
+    /** Pulse-sampling interval option ids are the number of minutes, as vigilance's are. */
+    const val RECORD_INTERVAL_DEFAULT: String = "10"
+
+    const val SLEEP_OFFBODY_OFF: String = "off"
+    const val SLEEP_OFFBODY_ON: String = "on"
+
+    fun recordIntervalMillis(optionId: String): Long = (optionId.toLongOrNull() ?: 10L) * 60_000L
+
     /** How hard the nudge and the SOS buzz. */
     const val VIBE_LOW: String = "low"
     const val VIBE_MED: String = "med"
@@ -119,27 +143,78 @@ object StyleSchema {
     }
 
 
-    fun create(resources: Resources): UserStyleSchema = UserStyleSchema(
-        listOfNotNull(
-            paletteSetting(resources),
-            tempSetting(resources),
-            pressureSetting(resources),
-            midnightLabelSetting(resources),
-            dialTopSetting(resources),
-            nadirSetting(resources),
-            solarMarkSetting(resources),
-            lunarMarkSetting(resources),
-            weatherSetting(resources),
-            vigilanceSetting(resources),
-            vigilanceIntervalSetting(resources),
-            vibeStrengthSetting(resources),
-            sosSoundSetting(resources),
-            logHeartRateSetting(resources),
-            sensorSlotSetting(resources, SENSOR_LEFT, R.string.style_sensor_left_name),
-            sensorSlotSetting(resources, SENSOR_RIGHT, R.string.style_sensor_right_name),
-            ambientDensitySetting(resources),
+    /**
+     * The world the schema is built for. Today both worlds carry the same list; the vital
+     * split (recorder settings in, units and sensor slots out) lands with the editor's own
+     * regating so the two can never disagree about what a section shows.
+     */
+    /**
+     * The settings this world offers, as pure data — [create] builds from exactly this list, so
+     * the split is testable on the JVM where a Resources cannot be had. A schema change resets
+     * every stored style on update, which makes an accidental drift in either list a
+     * user-visible incident rather than a refactor.
+     *
+     * The wellness face trades the two unit rows — they serve a weather row it does not print —
+     * for the recorder's switch and its sampling interval. The sensor slots stay: the rings are
+     * an estimate of a day, and an estimate is exactly when a wearer wants the actual reading
+     * beside it.
+     */
+    fun settingIds(world: String): List<UserStyleSetting.Id> {
+        val vital = world == WORLD_VITAL
+        return listOfNotNull(
+            PALETTE,
+            TEMP_UNIT.takeUnless { vital },
+            PRESSURE_UNIT.takeUnless { vital },
+            MIDNIGHT_LABEL,
+            DIAL_TOP,
+            NADIR,
+            SOLAR_MARK,
+            LUNAR_MARK,
+            WEATHER,
+            ALARM_MARK.takeIf { vital },
+            CALENDAR_MARKS.takeIf { vital },
+            RECORD.takeIf { vital },
+            RECORD_INTERVAL.takeIf { vital },
+            SLEEP_OFFBODY.takeIf { vital },
+            VIGILANCE,
+            VIGILANCE_INTERVAL,
+            VIBE_STRENGTH,
+            SOS_SOUND,
+            LOG_HEART_RATE,
+            SENSOR_LEFT,
+            SENSOR_RIGHT,
+            AMBIENT_DENSITY,
         )
-    )
+    }
+
+    fun create(resources: Resources, world: String): UserStyleSchema =
+        UserStyleSchema(settingIds(world).map { settingFor(it, resources) })
+
+    private fun settingFor(id: UserStyleSetting.Id, res: Resources): UserStyleSetting = when (id) {
+        PALETTE -> paletteSetting(res)
+        TEMP_UNIT -> tempSetting(res)
+        PRESSURE_UNIT -> pressureSetting(res)
+        MIDNIGHT_LABEL -> midnightLabelSetting(res)
+        DIAL_TOP -> dialTopSetting(res)
+        NADIR -> nadirSetting(res)
+        SOLAR_MARK -> solarMarkSetting(res)
+        LUNAR_MARK -> lunarMarkSetting(res)
+        WEATHER -> weatherSetting(res)
+        ALARM_MARK -> alarmMarkSetting(res)
+        CALENDAR_MARKS -> calendarMarksSetting(res)
+        RECORD -> recordSetting(res)
+        RECORD_INTERVAL -> recordIntervalSetting(res)
+        SLEEP_OFFBODY -> sleepOffBodySetting(res)
+        VIGILANCE -> vigilanceSetting(res)
+        VIGILANCE_INTERVAL -> vigilanceIntervalSetting(res)
+        VIBE_STRENGTH -> vibeStrengthSetting(res)
+        SOS_SOUND -> sosSoundSetting(res)
+        LOG_HEART_RATE -> logHeartRateSetting(res)
+        SENSOR_LEFT -> sensorSlotSetting(res, SENSOR_LEFT, R.string.style_sensor_left_name)
+        SENSOR_RIGHT -> sensorSlotSetting(res, SENSOR_RIGHT, R.string.style_sensor_right_name)
+        AMBIENT_DENSITY -> ambientDensitySetting(res)
+        else -> throw IllegalArgumentException("no factory for setting " + id)
+    }
 
     /**
      * Duty arc stroke width, as a fraction of the dial radius.
@@ -148,6 +223,9 @@ object StyleSchema {
      * visible unless a shift happened to be running, and this is the width the arc was designed at.
      */
     const val DUTY_ARC_WIDTH_FRACTION: Float = 0.028f
+
+    /** The wellness flavor's `BuildConfig.WORLD`. */
+    const val WORLD_VITAL: String = "vital"
 
     /** Reads an option id out of a [UserStyle], falling back to [fallback] when unset. */
     fun optionId(style: UserStyle, settingId: UserStyleSetting.Id, fallback: String): String =
@@ -393,6 +471,121 @@ object StyleSchema {
             // and has to find them, and a distress signal that has to be strained for is one that
             // is missed. Anyone who needs the watch quiet has OFF one tap away.
             defaultOption = options[3],
+        )
+    }
+
+    /**
+     * The next alarm, drawn on the daylight band. One mark, because the platform offers exactly
+     * one: the soonest alarm for the user, with the rest kept inside whichever clock app set
+     * them and exposed to nobody.
+     */
+    private fun alarmMarkSetting(res: Resources): ListUserStyleSetting {
+        val options = listOf(
+            listOption(res, ALARM_OFF, R.string.alarm_off, R.string.alarm_off_sr),
+            listOption(res, ALARM_ON, R.string.alarm_on, R.string.alarm_on_sr),
+        )
+        return ListUserStyleSetting(
+            ALARM_MARK,
+            res,
+            R.string.style_alarm_name,
+            R.string.style_alarm_desc,
+            null,
+            options,
+            listOf(WatchFaceLayer.BASE),
+            defaultOption = options[0],
+        )
+    }
+
+    /**
+     * Whether the hours the calendar has claimed are marked on the band. An indicator and not an
+     * agenda: overlapping events are one mark, because to a dial three meetings at ten are still
+     * "ten is busy", and whoever needs to know which opens the calendar.
+     */
+    private fun calendarMarksSetting(res: Resources): ListUserStyleSetting {
+        val options = listOf(
+            listOption(res, CALENDAR_OFF, R.string.calendar_off, R.string.calendar_off_sr),
+            listOption(res, CALENDAR_ON, R.string.calendar_on, R.string.calendar_on_sr),
+        )
+        return ListUserStyleSetting(
+            CALENDAR_MARKS,
+            res,
+            R.string.style_calendar_name,
+            R.string.style_calendar_desc,
+            null,
+            options,
+            listOf(WatchFaceLayer.BASE),
+            defaultOption = options[0],
+        )
+    }
+
+    /**
+     * Whether the day is kept at all. Off by default, and it must stay that way: it runs a
+     * foreground service for the life of the day and lights an optical LED against the skin
+     * every few minutes. Both are things to be asked for, never assumed.
+     */
+    /**
+     * Sleep from a watch that was not being worn — off by default, and asked for by name.
+     *
+     * A watch on the bedside charger can only say that nothing moved, which is a much weaker
+     * thing than a wrist that is still with a pulse near its floor: no phases, no wakings worth
+     * the name, and a drawer looks exactly like a good night. Offered anyway, because a wearer
+     * who takes the watch off to charge overnight currently gets nothing at all, and a rough
+     * answer they have switched on knowingly beats a blank.
+     */
+    private fun sleepOffBodySetting(res: Resources): ListUserStyleSetting {
+        val options = listOf(
+            listOption(res, SLEEP_OFFBODY_OFF, R.string.offbody_off, R.string.offbody_off_sr),
+            listOption(res, SLEEP_OFFBODY_ON, R.string.offbody_on, R.string.offbody_on_sr),
+        )
+        return ListUserStyleSetting(
+            SLEEP_OFFBODY,
+            res,
+            R.string.style_offbody_name,
+            R.string.style_offbody_desc,
+            null,
+            options,
+            listOf(WatchFaceLayer.BASE, WatchFaceLayer.COMPLICATIONS_OVERLAY),
+            defaultOption = options[0],
+        )
+    }
+
+    private fun recordSetting(res: Resources): ListUserStyleSetting {
+        val options = listOf(
+            listOption(res, RECORD_OFF, R.string.record_off, R.string.record_off_sr),
+            listOption(res, RECORD_ON, R.string.record_on, R.string.record_on_sr),
+        )
+        return ListUserStyleSetting(
+            RECORD,
+            res,
+            R.string.style_record_name,
+            R.string.style_record_desc,
+            null,
+            options,
+            listOf(WatchFaceLayer.BASE, WatchFaceLayer.COMPLICATIONS_OVERLAY),
+            defaultOption = options[0],
+        )
+    }
+
+    /**
+     * How often the pulse is sampled — the LED's whole cost, and the trail's resolution. Ten
+     * minutes by default: two samples in every quarter-hour bin, which survives an alarm the
+     * platform serves late without leaving the bin empty.
+     */
+    private fun recordIntervalSetting(res: Resources): ListUserStyleSetting {
+        val options = listOf(
+            listOption(res, "5", R.string.record_5, R.string.record_5_sr),
+            listOption(res, "10", R.string.record_10, R.string.record_10_sr),
+            listOption(res, "15", R.string.record_15, R.string.record_15_sr),
+        )
+        return ListUserStyleSetting(
+            RECORD_INTERVAL,
+            res,
+            R.string.style_record_interval_name,
+            R.string.style_record_interval_desc,
+            null,
+            options,
+            listOf(WatchFaceLayer.COMPLICATIONS_OVERLAY),
+            defaultOption = options[1],
         )
     }
 
