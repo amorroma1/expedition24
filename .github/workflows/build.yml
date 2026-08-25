@@ -40,9 +40,10 @@ jobs:
       # The specification for everything that cannot be eyeballed: dial angles, MSD/MTC and lunar
       # time, sunrise and sunset, the Morton range query against brute force, the motion band-pass,
       # the site pictogram rules and the weather cache.
-      # One flavor's JVM tests: the flavors share every class under test.
+      # Both flavors' JVM tests: the classes are shared, but the face gates differ per
+      # BuildConfig.WORLD, so each flavor exercises its own schema and renderer wiring.
       - name: Unit tests
-        run: ./gradlew :app:testEarthDebugUnitTest
+        run: ./gradlew :app:testEarthDebugUnitTest :app:testVitalDebugUnitTest
 
       # Lint fails the build on errors by default; almost free here, because the lint model is
       # already produced on the release path below.
@@ -68,12 +69,13 @@ jobs:
           python3 - <<'EOF'
           import glob, sys, zipfile
           failures = []
-          apks = sorted(glob.glob("app/build/outputs/apk/**/*.apk", recursive=True))
-          if not apks:
-              sys.exit("no APK was produced")
-          for apk in apks:
+          entry = "assets/poi_v1.bin"
+          earth = sorted(glob.glob("app/build/outputs/apk/earth/**/*.apk", recursive=True))
+          vital = sorted(glob.glob("app/build/outputs/apk/vital/**/*.apk", recursive=True))
+          if not earth:
+              sys.exit("no Earth APK was produced")
+          for apk in earth:
               names = zipfile.ZipFile(apk).namelist()
-              entry = "assets/poi_v1.bin"
               if entry not in names:
                   failures.append("%s: %s is missing" % (apk, entry))
                   continue
@@ -82,6 +84,13 @@ jobs:
                   failures.append("%s: %s is compressed" % (apk, entry))
               else:
                   print("%s: %s, %d bytes, stored" % (apk, entry, info.file_size))
+          # The vital face deliberately ships without the site index; its presence there would
+          # mean the flavor gate in build.gradle.kts has quietly come undone.
+          for apk in vital:
+              if entry in zipfile.ZipFile(apk).namelist():
+                  failures.append("%s: %s should not be packaged on vital" % (apk, entry))
+              else:
+                  print("%s: %s absent, as designed" % (apk, entry))
           if failures:
               sys.exit("\n".join(failures))
           EOF

@@ -109,6 +109,79 @@
     <string name="vigilance_10_sr">Check every ten minutes</string>
     <string name="vigilance_15">15 MIN</string>
     <string name="vigilance_15_sr">Check every fifteen minutes</string>
+    <!-- The day recorder: its own channel and notice, because two health services may run at
+         once and a wearer must be able to tell which is which. -->
+    <string name="vital_channel">Day recording</string>
+    <string name="vital_notification">Recording the day — pulse and steps</string>
+    <string name="editor_graphs">GRAPHS · PULSE, STEPS, SLEEP</string>
+    <string name="graphs_pulse">PULSE</string>
+    <string name="graphs_activity">ACTIVITY</string>
+    <string name="graphs_sleep">SLEEP · DEEP AT THE TOP</string>
+    <string name="graphs_axis">Midnight at the top, clockwise, a mark per quarter-hour. The circles are the scale; gaps are quarter-hours nobody watched.</string>
+    <!-- The raw grid, for working out why a night came back wrong. Named RAW rather than
+         EXPORT DAY because what leaves is the record and not the reading. -->
+    <string name="editor_raw_export">EXPORT RAW · 2 DAYS</string>
+    <string name="style_offbody_name">Sleep off the wrist</string>
+    <string name="style_offbody_desc">Read the night from a watch left on charge</string>
+    <string name="editor_label_offbody">SLEEP OFF WRIST</string>
+    <string name="offbody_off">OFF</string>
+    <string name="offbody_off_sr">Sleep is read only from a worn watch</string>
+    <string name="offbody_on">ON</string>
+    <string name="offbody_on_sr">A still watch off the wrist may be read as sleep</string>
+    <string name="editor_offbody_rationale">A watch off the wrist can only say that nothing moved: no pulse, no phases, and at least two hours before it counts as a night at all. Rough on purpose.</string>
+    <string name="style_alarm_name">Alarm mark</string>
+    <string name="style_alarm_desc">The next alarm, on the daylight band</string>
+    <string name="alarm_off">OFF</string>
+    <string name="alarm_off_sr">The next alarm is not marked</string>
+    <string name="alarm_on">ON</string>
+    <string name="alarm_on_sr">The next alarm is marked</string>
+    <string name="style_calendar_name">Calendar marks</string>
+    <string name="style_calendar_desc">Which hours are already spoken for</string>
+    <string name="calendar_off">OFF</string>
+    <string name="calendar_off_sr">Calendar hours are not marked</string>
+    <string name="calendar_on">ON</string>
+    <string name="calendar_on_sr">Calendar hours are marked</string>
+    <string name="editor_label_alarm">ALARM MARK</string>
+    <string name="editor_label_calendar">CALENDAR</string>
+    <string name="editor_alarm_note">Only the next alarm, and only within a day — the watch offers no more than that, and a mark further out would sit at the hour of one set for tonight.</string>
+    <string name="editor_calendar_note">Marks the hours something is booked, not what. Only what has synced to the watch is there, and an empty band can mean an empty diary or a calendar that has not arrived.</string>
+    <string name="style_record_name">Record the day</string>
+    <string name="style_record_desc">Pulse and steps, quarter-hour by quarter-hour</string>
+    <string name="record_off">OFF</string>
+    <string name="record_off_sr">The day is not recorded</string>
+    <string name="record_on">ON</string>
+    <string name="record_on_sr">The day is recorded</string>
+    <string name="style_record_interval_name">Pulse interval</string>
+    <string name="style_record_interval_desc">How often the pulse is sampled</string>
+    <string name="record_5">5 MIN</string>
+    <string name="record_5_sr">Every five minutes</string>
+    <string name="record_10">10 MIN</string>
+    <string name="record_10_sr">Every ten minutes</string>
+    <string name="record_15">15 MIN</string>
+    <string name="record_15_sr">Every fifteen minutes</string>
+    <string name="editor_section_recorder">RECORDER</string>
+    <string name="editor_label_record">RECORD DAY</string>
+    <string name="editor_label_record_interval">PULSE EVERY</string>
+    <string name="editor_record_rationale">A watch face sees no sensors with the screen off, so the day is kept by a small background service. The pulse LED is lit about twenty seconds each interval.</string>
+
+    <!-- The day's report: a score, the two or three things worth changing, and the figures.
+         The wording never diagnoses; the strongest thing it says is that a pattern has held. -->
+    <string name="report_title">TODAY</string>
+    <string name="report_no_data">Nothing recorded yet. Switch RECORD DAY on in the settings and the day will start filling in.</string>
+    <string name="report_nothing_to_change">A good day. Nothing worth changing tomorrow.</string>
+    <string name="report_steps">Steps %1$d</string>
+    <string name="report_resting">Rest %1$d bpm</string>
+    <string name="report_resting_unknown">Rest — too few readings yet</string>
+    <string name="report_sleep">Slept %1$d:%2$02d, %3$d wakes</string>
+    <string name="report_sleep_unknown">No night found on file</string>
+    <string name="report_pulse_graph">PULSE, MIDNIGHT TO MIDNIGHT</string>
+    <string name="report_disclaimer">A pattern read through a wrist, not a medical instrument. Sleep is inferred from stillness and pulse, to the nearest quarter-hour.</string>
+    <string name="advice_more_steps">Walk more tomorrow — today came in under your own usual.</string>
+    <string name="advice_high_hr">Your pulse ran high while you sat still. Less coffee, or less pressure.</string>
+    <string name="advice_high_hr_persistent">A high sitting pulse for several days now. Worth mentioning to a doctor.</string>
+    <string name="advice_sleep_more">Short night. Take the sleep back — a nap, or an earlier one tonight.</string>
+    <string name="advice_sleep_earlier">Short night, and a late one. Going to bed earlier is the whole fix.</string>
+
     <string name="vigilance_channel">Vigilance monitoring</string>
     <string name="vigilance_notification">Watch under way — monitoring</string>
 

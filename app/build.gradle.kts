@@ -48,7 +48,12 @@ val packPoi = tasks.register<PackPoi>("packPoi") {
 
 androidComponents {
     onVariants { variant ->
-        variant.sources.assets?.addGeneratedSourceDirectory(packPoi, PackPoi::outputDir)
+        // The site index is Earth's: the vital face has no site lock — its 24 hours belong to
+        // the wearer's body, not to the nearest aerodrome — and 138 KB of airports would still
+        // have to pass the CI presence check. Every other flavor gets the asset as before.
+        if (variant.flavorName != "vital") {
+            variant.sources.assets?.addGeneratedSourceDirectory(packPoi, PackPoi::outputDir)
+        }
     }
 }
 
@@ -159,8 +164,23 @@ android {
             // The updater looks for its own releases only: the tag prefix and the asset name are
             // build fields rather than constants so a build can never offer itself an APK that
             // is not the one it was compiled as.
+            buildConfigField("String", "WORLD", "\"earth\"")
             buildConfigField("String", "UPDATE_TAG_PREFIX", "\"v\"")
             buildConfigField("String", "UPDATE_ASSET", "\"app-earth-release.apk\"")
+        }
+        create("vital") {
+            dimension = "world"
+            // A separate application id so the wellness face installs beside the duty one: the
+            // platform treats a different id as a different app, which here is the point.
+            applicationIdSuffix = ".vital"
+            // An independent version line: the platform compares versionCode per package.
+            versionCode = 5
+            versionName = "0.1.4"
+            buildConfigField("String", "WORLD", "\"vital\"")
+            // "vital-v" cannot collide with Earth's bare "v": ReleaseCheck filters the release
+            // list by prefix and exact asset name, and neither passes the other's gate.
+            buildConfigField("String", "UPDATE_TAG_PREFIX", "\"vital-v\"")
+            buildConfigField("String", "UPDATE_ASSET", "\"app-vital-release.apk\"")
         }
     }
 

@@ -5,6 +5,7 @@ package com.avdesign.mfd24.update
 
 import android.util.Log
 import com.avdesign.mfd24.BuildConfig
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
@@ -15,13 +16,16 @@ import java.net.URL
  * Asks GitHub what the latest release of this face is.
  *
  * The releases page is the product's only distribution channel — there is no store listing on
- * purpose (the README says why) — so "is there an update" has exactly one authoritative answer:
- * the `releases/latest` endpoint of the repository the APK was built from. One request, no token,
- * no library: the same bare `HttpURLConnection` + platform `org.json` shape as `MetarClient` and
- * `OpenMeteoClient`, because a JSON body this small does not justify a dependency.
+ * purpose (the README says why) — so "is there an update" has one authoritative answer: the
+ * repository's release list. The *list*, not `releases/latest`: GitHub's "latest" is one release
+ * per repository, and with two faces publishing, whichever shipped most recently would hide the
+ * other's newest from its own updater for good. One request, no token, no library: the same bare
+ * `HttpURLConnection` + platform `org.json` shape as `MetarClient` and `OpenMeteoClient`.
  *
- * The three faces share the repository but not the releases: each flavor carries its tag prefix
- * and asset name in `BuildConfig`, so the Earth face never offers itself a Mars build.
+ * The faces share the repository but not the releases: each flavor carries its tag prefix and
+ * asset name in `BuildConfig`, filters the list to its own, and takes the highest version — by
+ * numeric compare, not list order, because a re-published release floats on `created_at`. The
+ * Earth face therefore never offers itself a Mars build, and neither face can eclipse the other.
  */
 object ReleaseCheck {
 
@@ -62,7 +66,7 @@ object ReleaseCheck {
      * malformed body, or a latest release that is not this face's. The caller must keep "cannot
      * know" apart from "up to date": null is never the latter.
      */
-    fun latest(url: String = LATEST_URL): Release? {
+    fun latest(url: String = RELEASES_URL): Release? {
         var connection: HttpURLConnection? = null
         return try {
             connection = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -91,31 +95,54 @@ object ReleaseCheck {
     }
 
     /**
-     * Pure parse of a `releases/latest` payload. Null when the tag does not carry [tagPrefix]
-     * (another face's release, or a scheme change) or the expected [assetName] is not attached —
-     * a release with no APK is an authoring mistake this code must not try to install around.
+     * Pure parse of a release-list payload: this flavor's newest installable release, or null
+     * when the list holds none. A release counts only when its tag carries [tagPrefix], it is
+     * neither a draft nor a prerelease, and the expected [assetName] is attached — one with no
+     * APK for this flavour is an authoring mistake, skipped with a log rather than installed
+     * around *or* allowed to eclipse the installable release beneath it. Among the survivors the
+     * highest version wins, compared numerically: the list arrives ordered by creation, and a
+     * release re-published to fix its notes would otherwise outrank everything after it.
      */
     fun parse(json: String, tagPrefix: String, assetName: String): Release? {
         return try {
-            val root = JSONObject(json)
-            val tag = root.optString("tag_name")
-            if (!tag.startsWith(tagPrefix)) return null
-            val version = tag.removePrefix(tagPrefix)
-            if (version.isEmpty()) return null
-            val assets = root.optJSONArray("assets") ?: return null
-            for (i in 0 until assets.length()) {
-                val asset = assets.getJSONObject(i)
-                if (asset.optString("name") != assetName) continue
-                val url = asset.optString("browser_download_url")
-                val size = asset.optLong("size")
-                if (url.isEmpty() || size <= 0L) return null
-                return Release(version, url, size)
+            val releases = JSONArray(json)
+            var best: Release? = null
+            for (i in 0 until releases.length()) {
+                val candidate = parseOne(releases.getJSONObject(i), tagPrefix, assetName)
+                    ?: continue
+                if (best == null || isNewer(candidate.version, best.version)) best = candidate
             }
-            null
+            best
         } catch (e: JSONException) {
             Log.w(TAG, "release payload did not parse", e)
             null
         }
+    }
+
+    private fun parseOne(root: JSONObject, tagPrefix: String, assetName: String): Release? {
+        val tag = root.optString("tag_name")
+        if (!tag.startsWith(tagPrefix)) return null
+        val version = tag.removePrefix(tagPrefix)
+        if (version.isEmpty()) return null
+        // What is left has to be a plain version. The Earth face's prefix is a bare `v`, which is
+        // also the first letter of `vital-v0.1.0`: without this the Vital release would arrive
+        // here as a version of "ital-v0.1.0", and only the asset name would be keeping the two
+        // faces apart. Two locks on a door that opens onto an install prompt.
+        if (!version.all { it.isDigit() || it == '.' }) return null
+        // A draft is not published and a prerelease is not offered to a wrist: both exist so a
+        // release can be staged without every watch in the field announcing it mid-authoring.
+        if (root.optBoolean("draft") || root.optBoolean("prerelease")) return null
+        val assets = root.optJSONArray("assets") ?: return null
+        for (i in 0 until assets.length()) {
+            val asset = assets.getJSONObject(i)
+            if (asset.optString("name") != assetName) continue
+            val url = asset.optString("browser_download_url")
+            val size = asset.optLong("size")
+            if (url.isEmpty() || size <= 0L) break
+            return Release(version, url, size)
+        }
+        Log.w(TAG, "release $tag carries no usable $assetName; skipped")
+        return null
     }
 
     /**
@@ -153,7 +180,12 @@ object ReleaseCheck {
         if (!stored.isNullOrEmpty() && isNewer(stored, installed)) stored else null
 
     private const val TAG = "ReleaseCheck"
-    private const val LATEST_URL = "https://api.github.com/repos/$REPO/releases/latest"
+
+    /**
+     * Fifteen covers years of the standing policy — one release object per face, superseded in
+     * place — while staying one page even if history is ever allowed to accumulate.
+     */
+    private const val RELEASES_URL = "https://api.github.com/repos/$REPO/releases?per_page=15"
     private const val CONNECT_TIMEOUT_MS = 15_000
     private const val READ_TIMEOUT_MS = 15_000
     private const val USER_AGENT = "MFD-24 watch face (github.com/$REPO)"

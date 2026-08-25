@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 R. Kravcov -->
+<!-- Merged over the main manifest: the day recorder belongs to this face alone, and the duty
+     face must not carry a service it never starts. Type health for the same reason vigilance
+     is: it reads body sensors with the screen off, which is the only time a day happens. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Asked for from the settings screen and only when the calendar row is switched on: a
+         watch face cannot raise a dialog, and a permission nobody has opted into is one that
+         gets refused on principle. The next alarm needs no permission at all. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
+    <application>
+        <service
+            android:name=".data.VitalRecorderService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
+        <!-- The day read back, opened by a double tap on the face. Not exported: nothing outside
+             this app has any business reading a wearer's day. -->
+        <activity
+            android:name=".health.VitalGraphsActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
+        <!-- The raw grid as a code and as tones. Not exported, like everything else that can
+             see a wearer's day. -->
+        <activity
+            android:name=".health.RawDayExportActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
+        <activity
+            android:name=".health.VitalReportActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+    </application>
+</manifest>

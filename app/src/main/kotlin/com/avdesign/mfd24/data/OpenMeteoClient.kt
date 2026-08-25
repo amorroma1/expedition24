@@ -31,6 +31,10 @@ data class WeatherSample(
  */
 object OpenMeteoClient {
 
+
+    /** No figure for this hour. */
+    const val NO_VALUE = -1
+
     private const val TAG = "OpenMeteoClient"
     private const val ENDPOINT = "https://api.open-meteo.com/v1/forecast"
     private const val CONNECT_TIMEOUT_MS = 15_000
@@ -40,8 +44,7 @@ object OpenMeteoClient {
     fun fetch(latitude: Double, longitude: Double, nowMillis: Long): WeatherSample? {
         val url = String.format(
             Locale.US,
-            "%s?latitude=%.4f&longitude=%.4f&current=temperature_2m,weather_code,pressure_msl" +
-                "&timezone=UTC",
+            "%s?latitude=%.4f&longitude=%.4f&current=temperature_2m,weather_code,pressure_msl",
             ENDPOINT, latitude, longitude,
         )
 

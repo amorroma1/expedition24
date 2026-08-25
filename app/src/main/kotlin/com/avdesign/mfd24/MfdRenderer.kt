@@ -22,11 +22,18 @@ import com.avdesign.mfd24.astro.MoonState
 import com.avdesign.mfd24.astro.PlanetMode
 import com.avdesign.mfd24.astro.SolarTime
 import com.avdesign.mfd24.data.Alerts
+import com.avdesign.mfd24.data.DayMarks
+import com.avdesign.mfd24.data.OpenMeteoClient
 import com.avdesign.mfd24.data.TelemetryState
+import com.avdesign.mfd24.data.VitalState
 import com.avdesign.mfd24.data.SensorSlots
 import com.avdesign.mfd24.data.VigilanceState
 import com.avdesign.mfd24.data.VigilanceStore
 import com.avdesign.mfd24.data.WatchShiftState
+import com.avdesign.mfd24.health.DayBins
+import com.avdesign.mfd24.health.SleepModel
+import com.avdesign.mfd24.health.VitalRings
+import com.avdesign.mfd24.render.ActivityTrailLayer
 import com.avdesign.mfd24.render.AmbientAuto
 import com.avdesign.mfd24.render.AmbientLayer
 import com.avdesign.mfd24.render.DaylightLayer
@@ -87,6 +94,22 @@ class MfdRenderer(
     private val onVigilanceRequest: (Boolean, Long, Int, Int, Boolean, Long, Long) -> Unit,
     /** Which reading each slot beside the hub wants, as SensorSlots.Kind ordinals. */
     private val onSensorSlots: (Int, Int) -> Unit,
+    /**
+     * `(recording, intervalMillis)` — the wellness face's recorder. Fired only when the answer
+     * changes, like every callback out of applyStyle, and a no-op on any other face.
+     */
+    private val onRecordRequest: (Boolean, Long) -> Unit = { _, _ -> },
+    /**
+     * `(midnightUp, midnightAs24, sleepOffBody)` — style the wellness face's own screens need.
+     *
+     * A Renderer has no Context and cannot write preferences; the service does it. Fired only on
+     * a change, like every other callback out of `applyStyle`, and the reason it exists at all is
+     * that the graphs are drawn by a plain activity with no style of its own — and a graph drawn
+     * midnight-up beside a dial drawn noon-up is one the reader has to flip in their head.
+     */
+    private val onVitalStyle: (Boolean, Boolean, Boolean) -> Unit = { _, _, _ -> },
+    /** The wellness face's day, or null on any face that keeps none. */
+    private val vitalState: VitalState? = null,
     /** Resolved strings for the spoken labels — a Renderer has no Context to resolve its own. */
     private val descriptions: FaceDescriptions,
 ) : Renderer.CanvasRenderer2<MfdRenderer.Assets>(
@@ -103,7 +126,7 @@ class MfdRenderer(
         override fun onDestroy() = Unit
     }
 
-    private val geometry = Geometry()
+    private val geometry = Geometry(vitalReadout = BuildConfig.WORLD == WORLD_VITAL)
     private val palette = Palette()
 
     /**
@@ -119,6 +142,7 @@ class MfdRenderer(
     private val handsLayer = HandsLayer()
     private val secondsMarker = SecondsMarker()
     private val dutyArcLayer = DutyArcLayer()
+    private val activityTrailLayer = ActivityTrailLayer()
     private val telemetryLayer = TelemetryLayer()
     private val ambientLayer = AmbientLayer()
 
@@ -132,6 +156,78 @@ class MfdRenderer(
      */
     private val planetMode: Int = PlanetMode.EARTH
 
+    /**
+     * Whether this build is the wellness face. Fixed per flavor: the two faces share every
+     * layer and differ in what they are *for*, so the gates read as one word at each site
+     * rather than as a scatter of build-config comparisons in the frame loop.
+     */
+    private val vitalFace: Boolean = BuildConfig.WORLD == WORLD_VITAL
+
+    /**
+     * What the wellness rows print. Written from the recorder's published state once it exists;
+     * until then they stay negative, which is how the rows say "not known" — the face prints no
+     * placeholder dashes, here or anywhere else.
+     */
+    @Volatile
+    private var vitalSleepMinutes: Int = -1
+
+    @Volatile
+    private var vitalDayScore: Int = -1
+
+    @Volatile
+    private var vitalRestingBpm: Int = -1
+
+    @Volatile
+    private var vitalStepsToday: Int = -1
+
+    /** Effort in the bin under the hand, 0..255; the slot pictogram's colour reads it. */
+    private var currentEffort: Int = 0
+
+    /** The bin currently painted from a live reading, or −1; see the restore above. */
+    private var liveBin: Int = -1
+
+    /** The resting rate the trail's colours were built against, for repainting one bin. */
+    private var trailResting: Int = DayBins.NO_BPM
+
+    // Change-gated, so the frame loop never pokes the recorder with what it already knows.
+    private var lastRecordRequest: Boolean? = null
+    private var lastRecordInterval: Long = -1L
+
+    // The trail: bins copied when the day's version moves, colours precomputed with them, angles
+    // re-derived per frame so a glide or a flip carries the day with the dial. All preallocated —
+    // render() allocates nothing.
+    private var vitalVersionSeen = -1
+
+    /** Scratch for the rolling day's own sleep; refilled on a publication, never per frame. */
+    private val sleepScratch = com.avdesign.mfd24.health.SleepResult()
+    private val trailHr = ByteArray(DayBins.BIN_COUNT)
+    private val trailSteps = ShortArray(DayBins.BIN_COUNT)
+    private val trailFlags = ByteArray(DayBins.BIN_COUNT)
+    private val trailAngles = FloatArray(DayBins.BIN_COUNT)
+    private var trailCount = 0
+
+    /** First bin of the clear window ahead of the hand, or −1 when the rings are not drawn. */
+    private var trailSkipFrom = -1
+    private val pulseColors = IntArray(DayBins.BIN_COUNT)
+    private val activityColors = IntArray(DayBins.BIN_COUNT)
+    private val sleepColors = IntArray(DayBins.BIN_COUNT)
+    private val pulseColorsAmbient = IntArray(DayBins.BIN_COUNT)
+    private val activityColorsAmbient = IntArray(DayBins.BIN_COUNT)
+    private val sleepColorsAmbient = IntArray(DayBins.BIN_COUNT)
+    private val pulseWeights = FloatArray(DayBins.BIN_COUNT)
+    private val activityWeights = FloatArray(DayBins.BIN_COUNT)
+    private val sleepWeights = FloatArray(DayBins.BIN_COUNT)
+
+    // The day's marks: the next alarm as one angle, the calendar as spans copied when their
+    // version moves and re-angled per frame like everything else on the hour scale.
+    private var alarmAngle = Float.NaN
+    private var eventsVersionSeen = -1
+    private var eventCount = 0
+    private val eventStartMillis = LongArray(DayMarks.MAX_EVENTS)
+    private val eventEndMillis = LongArray(DayMarks.MAX_EVENTS)
+    private val eventAngles = FloatArray(DayMarks.MAX_EVENTS)
+    private val eventSweeps = FloatArray(DayMarks.MAX_EVENTS)
+
     @Volatile
     private var fahrenheit: Boolean = false
 
@@ -140,6 +236,13 @@ class MfdRenderer(
 
     @Volatile
     private var midnightAs24: Boolean = false
+
+    /** Whether sleep may be read off a watch that was not on a wrist; the wellness face only. */
+    private var sleepOffBody: Boolean = false
+
+    private var lastMidnightUp: Boolean? = null
+    private var lastMidnightAs24: Boolean? = null
+    private var lastOffBodyPublished: Boolean? = null
 
     @Volatile
     private var midnightUp: Boolean = false
@@ -152,6 +255,12 @@ class MfdRenderer(
 
     @Volatile
     private var lunarMarkEnabled: Boolean = false
+
+    @Volatile
+    private var alarmMarkEnabled: Boolean = false
+
+    @Volatile
+    private var calendarMarksEnabled: Boolean = false
 
     /** Scratch for the moon model, refilled in place; render() allocates nothing. */
     private val moonState = MoonState()
@@ -259,6 +368,12 @@ class MfdRenderer(
         lunarMarkEnabled = StyleSchema.optionId(
             style, StyleSchema.LUNAR_MARK, StyleSchema.LUNAR_OFF
         ) == StyleSchema.LUNAR_ON
+        alarmMarkEnabled = StyleSchema.optionId(
+            style, StyleSchema.ALARM_MARK, StyleSchema.ALARM_OFF
+        ) == StyleSchema.ALARM_ON
+        calendarMarksEnabled = StyleSchema.optionId(
+            style, StyleSchema.CALENDAR_MARKS, StyleSchema.CALENDAR_OFF
+        ) == StyleSchema.CALENDAR_ON
         // The weather switch reaches the repository as well as the renderer: off means nothing is
         // fetched, not merely that the row is blank.
         onWeatherEnabled(
@@ -288,6 +403,39 @@ class MfdRenderer(
         logHeartRate = StyleSchema.optionId(
             style, StyleSchema.LOG_HEART_RATE, StyleSchema.LOG_HR_OFF
         ) == StyleSchema.LOG_HR_ON
+        if (vitalFace) {
+            val recording = StyleSchema.optionId(
+                style, StyleSchema.RECORD, StyleSchema.RECORD_OFF
+            ) == StyleSchema.RECORD_ON
+            val interval = StyleSchema.recordIntervalMillis(
+                StyleSchema.optionId(
+                    style, StyleSchema.RECORD_INTERVAL, StyleSchema.RECORD_INTERVAL_DEFAULT
+                )
+            )
+            if (recording != lastRecordRequest || interval != lastRecordInterval) {
+                lastRecordRequest = recording
+                lastRecordInterval = interval
+                onRecordRequest(recording, interval)
+            }
+            val offBody = StyleSchema.optionId(
+                style, StyleSchema.SLEEP_OFFBODY, StyleSchema.SLEEP_OFFBODY_OFF
+            ) == StyleSchema.SLEEP_OFFBODY_ON
+            if (offBody != sleepOffBody) {
+                sleepOffBody = offBody
+                // The sleep ring is only rebuilt when the day changes, so a switch flipped in the
+                // editor would otherwise take effect at the next quarter-hour rather than at once.
+                vitalVersionSeen = -1
+            }
+            if (midnightUp != lastMidnightUp ||
+                midnightAs24 != lastMidnightAs24 ||
+                offBody != lastOffBodyPublished
+            ) {
+                lastMidnightUp = midnightUp
+                lastMidnightAs24 = midnightAs24
+                lastOffBodyPublished = offBody
+                onVitalStyle(midnightUp, midnightAs24, offBody)
+            }
+        }
         palette.update(paletteId, planetMode)
         // Always-on is the same palette, dimmed. Nothing to cross-fade on waking.
         ambientPalette.updateAmbientFrom(palette)
@@ -428,7 +576,11 @@ class MfdRenderer(
 
         // Vigilance follows the shift: it exists to watch someone on duty, and there is no sense
         // nagging anyone who is not. Reported only on a change, so a frame never pokes the service.
-        val wantVigilance = vigilanceEnabled && dutyState == WatchShiftState.DUTY_ACTIVE
+        // Vigilance watches somebody on watch — on the duty face that means a shift is running.
+        // The wellness face has no shift to hang it on, so the switch alone arms it there; the
+        // charge and off-body suspensions are unchanged, and they are what keep it honest.
+        val wantVigilance = vigilanceEnabled &&
+            (vitalFace || dutyState == WatchShiftState.DUTY_ACTIVE)
         // The shift's start is one of the things a change is watched for, not just something sent
         // along: ending a watch and beginning another is the case where a stale incident has to be
         // retired, and it need not pass through a frame in which no watch is running.
@@ -494,6 +646,111 @@ class MfdRenderer(
                 vigilanceStatus == VigilanceState.ALARM -> 1f
 
             else -> 0f
+        }
+
+        // The day's trail. The bins are instants like everything else on this dial, so their
+        // angles go through the same mapping as the hands: a quarter-hour drawn at 07:15 stays
+        // at 07:15 when the scale glides or the dial is flipped.
+        trailCount = 0
+        trailSkipFrom = -1
+        val day = vitalState
+        if (vitalFace && day != null) {
+            if (vitalVersionSeen != day.version) {
+                day.copyBins(trailHr, trailSteps, trailFlags)
+                vitalVersionSeen = day.version
+                // The night under way has not been through a day-close yet, so its bins carry no
+                // sleep flag: infer it here, over the rolling day the state publishes, or the
+                // sleep ring would only ever appear the morning after.
+                val resting = SleepModel.restingBpm(trailHr, trailFlags, DayBins.BIN_COUNT)
+                SleepModel.infer(
+                    trailHr, trailSteps, trailFlags, DayBins.BIN_COUNT, resting, sleepScratch,
+                    allowOffBody = sleepOffBody,
+                )
+                for (r in 0 until sleepScratch.runCount) {
+                    for (b in sleepScratch.startBin[r] until sleepScratch.endBin[r]) {
+                        trailFlags[b] = (trailFlags[b].toInt() or DayBins.FLAG_SLEEP).toByte()
+                    }
+                }
+                rebuildTrailColors(if (resting > DayBins.NO_BPM) resting else day.restingBpm)
+            }
+            val binHours = DayBins.BIN_MINUTES / 60.0
+            var i = 0
+            while (i < DayBins.BIN_COUNT) {
+                trailAngles[i] = AstroTime.hourHandAngle(i * binHours, flipped)
+                i++
+            }
+            trailCount = DayBins.BIN_COUNT
+            // A clear half-hour ahead of the hand. The rings carry a rolling twenty-four hours,
+            // so without a seam the arc runs straight past the hand's tip into yesterday's
+            // quarter-hours and nothing on the circle says which end is now. Two bins is enough
+            // to read as a gap at this stroke width and short enough to cost no history — and it
+            // is drawn as absence rather than as a mark, because absence is the one thing the
+            // rings already mean.
+            trailSkipFrom = (day.currentBin.coerceIn(0, DayBins.BIN_COUNT - 1) + 1) %
+                DayBins.BIN_COUNT
+            vitalSleepMinutes = day.sleepMinutes
+            vitalDayScore = day.dayScore
+            vitalRestingBpm = if (day.restingBpm > DayBins.NO_BPM) day.restingBpm else -1
+            vitalStepsToday = day.stepsToday
+            // The quarter-hour under the hand, painted from the reading on the dial rather than
+            // from the last one the recorder wrote.
+            //
+            // Without this the ring's leading edge is a placeholder until the quarter-hour
+            // closes — faint where the pictogram beside it is bright coral — and the colour hint
+            // the pictogram is there to give points at nothing. Live, the two agree by
+            // construction, which is the whole claim: the heart is the colour of the arc under
+            // the hand. Written straight into the prepared arrays, so `render()` still allocates
+            // nothing.
+            val bin = day.currentBin.coerceIn(0, DayBins.BIN_COUNT - 1)
+            val liveBpm = telemetry.heartRate
+            val binBpm = if (liveBpm > DayBins.NO_BPM) liveBpm else trailHr[bin].toInt() and 0xFF
+            currentEffort = VitalRings.effort(
+                trailSteps[bin].toInt(), binBpm, day.restingBpm,
+            )
+            if (liveBpm > DayBins.NO_BPM && trailFlags[bin].toInt() and DayBins.FLAG_SLEEP == 0) {
+                pulseColors[bin] = VitalRings.pulseColor(liveBpm)
+                pulseWeights[bin] = VitalRings.pulseWeight(liveBpm)
+                pulseColorsAmbient[bin] =
+                    Palette.dimKeepingAlpha(pulseColors[bin], Palette.AMBIENT_LEVEL)
+                activityColors[bin] = VitalRings.activityColor(currentEffort)
+                activityWeights[bin] = VitalRings.activityWeight(currentEffort)
+                activityColorsAmbient[bin] =
+                    Palette.dimKeepingAlpha(activityColors[bin], Palette.AMBIENT_LEVEL)
+                liveBin = bin
+            } else if (liveBin >= 0) {
+                // The reading went away — the screen slept, the wrist came off — so the bin goes
+                // back to what was actually recorded for it. Without this the last live colour
+                // would sit there until the quarter-hour closed, which is a ring saying something
+                // no sensor is currently saying.
+                computeBinColors(liveBin, trailResting)
+                liveBin = -1
+            }
+        }
+
+        // The alarm and the calendar, mapped like every other instant on this dial. Both are
+        // gated on their own settings, and the alarm drops itself once it has fired — a mark for
+        // an alarm that has already gone off is a mark that lies about the future.
+        alarmAngle = Float.NaN
+        if (alarmMarkEnabled && telemetry.nextAlarmMillis > wallMillis) {
+            alarmAngle = AstroTime.hourHandAngle(
+                planetHoursAt(telemetry.nextAlarmMillis, mode, utcOffsetMillis), flipped,
+            )
+        }
+        if (!calendarMarksEnabled) {
+            eventCount = 0
+        } else {
+            if (eventsVersionSeen != telemetry.eventsVersion) {
+                eventCount = telemetry.copyEvents(eventStartMillis, eventEndMillis)
+                eventsVersionSeen = telemetry.eventsVersion
+            }
+            var e = 0
+            while (e < eventCount) {
+                eventAngles[e] = AstroTime.hourHandAngle(
+                    planetHoursAt(eventStartMillis[e], mode, utcOffsetMillis), flipped,
+                )
+                eventSweeps[e] = sweepFor(eventEndMillis[e] - eventStartMillis[e], period)
+                e++
+            }
         }
 
         // The sky marks sit at their bodies' hour angles — apparent solar time for the sun, the
@@ -671,10 +928,8 @@ class MfdRenderer(
             // wants it in a different palette and renders once a minute, so a second pair of
             // 454 x 454 bitmaps would cost memory to save time that is not scarce.
             canvas.drawColor(Color.BLACK)
-            daylightLayer.draw(
-                canvas, geometry, p.daylightBand,
-                transition.daylightStart, transition.daylightSweep,
-            )
+            drawDaylight(canvas, p)
+            drawDayMarks(canvas, p)
             if (!sunAngle.isNaN()) {
                 daylightLayer.drawSun(canvas, geometry, p.sunMark, p.background, sunAngle)
             }
@@ -690,10 +945,8 @@ class MfdRenderer(
             // between the two blits recycled a bitmap the frame was still going to draw.
             dialLayer.prepare(geometry, palette, styleGeneration, midnightAs24)
             canvas.drawBitmap(dialLayer.background(), 0f, 0f, null)
-            daylightLayer.draw(
-                canvas, geometry, p.daylightBand,
-                transition.daylightStart, transition.daylightSweep,
-            )
+            drawDaylight(canvas, p)
+            drawDayMarks(canvas, p)
             if (!sunAngle.isNaN()) {
                 daylightLayer.drawSun(canvas, geometry, p.sunMark, p.background, sunAngle)
             }
@@ -723,6 +976,27 @@ class MfdRenderer(
             )
         }
 
+        // The day's three rings, over the scale and under the hands, so the hand crosses what it
+        // wrote. Counts are zero on any face that keeps no day, so this costs nothing elsewhere.
+        if (trailCount > 0) {
+            val width = geometry.ringWidthVital
+            activityTrailLayer.draw(
+                canvas, geometry.pulseTrack, trailAngles, TRAIL_BIN_SWEEP,
+                if (ambient) pulseColorsAmbient else pulseColors, pulseWeights, trailCount, width,
+                trailSkipFrom, TRAIL_SKIP_BINS,
+            )
+            activityTrailLayer.draw(
+                canvas, geometry.activityTrack, trailAngles, TRAIL_BIN_SWEEP,
+                if (ambient) activityColorsAmbient else activityColors, activityWeights,
+                trailCount, width, trailSkipFrom, TRAIL_SKIP_BINS,
+            )
+            activityTrailLayer.draw(
+                canvas, geometry.sleepTrack, trailAngles, TRAIL_BIN_SWEEP,
+                if (ambient) sleepColorsAmbient else sleepColors, sleepWeights, trailCount, width,
+                trailSkipFrom, TRAIL_SKIP_BINS,
+            )
+        }
+
         // Printed on the dial, under the hands, the way dial text always is. The layer haloes its
         // own type in the background colour, which keeps it separated from the ticks and the arc.
         telemetryLayer.draw(
@@ -730,6 +1004,14 @@ class MfdRenderer(
             fahrenheit, mmHg, dutyState, dutyMillis, vigilance.status, showClearHint,
             incidentMillis, incidentElapsedMillis, sensorLeft, sensorRight, layoutGeneration,
             frameSymbol,
+            // The day's own figures; negative until the recorder has enough of a day to speak,
+            // and a row that cannot speak is not drawn at all.
+            sleepMinutes = vitalSleepMinutes,
+            dayScore = vitalDayScore,
+            restingBpm = vitalRestingBpm,
+            stepsToday = vitalStepsToday,
+            vitalRows = vitalFace,
+            currentEffort = currentEffort,
         )
 
         handsLayer.drawHourMinute(canvas, geometry, p, hourAngle, minuteAngle)
@@ -814,6 +1096,98 @@ class MfdRenderer(
         }
     }
 
+    /**
+     * The alarm and the calendar, over the band and under the scale: they are about the band's
+     * own hours, not a ring of their own, and the ticks must still read through them.
+     */
+    private fun drawDayMarks(canvas: Canvas, p: Palette) {
+        daylightLayer.drawEvents(
+            canvas, geometry, p.incidentMark, eventAngles, eventSweeps, eventCount,
+        )
+        daylightLayer.drawAlarm(canvas, geometry, p.second, alarmAngle)
+    }
+
+    /**
+     * The daylight band: one arc, sunrise to sunset, and nothing else on it.
+     *
+     * It has carried more. Hour-by-hour cloud shading inside the day, then a civil and an
+     * astronomical wedge either side of it — and each addition cost the band a little of the one
+     * thing it is for. The wedges went on 2026-08-25 at the user's word, after a measurement that
+     * put them at exactly the right instants and made the point anyway: a reader glancing at a
+     * wrist wants the day, and every other shade on the ring is something to rule out first.
+     */
+    private fun drawDaylight(canvas: Canvas, p: Palette) {
+        daylightLayer.draw(
+            canvas, geometry, p.daylightBand,
+            transition.daylightStart, transition.daylightSweep,
+        )
+    }
+
+    /**
+     * Turns the copied bins into the colours the trail is stroked in — once per publication,
+     * never per frame. The ambient twin is pre-dimmed by the same channel scaling the palette
+     * uses, so always-on has nothing to compute and nothing to cross-fade.
+     */
+    private fun rebuildTrailColors(restingBpm: Int) {
+        trailResting = restingBpm
+        var i = 0
+        while (i < DayBins.BIN_COUNT) {
+            computeBinColors(i, restingBpm)
+            i++
+        }
+    }
+
+    /** One quarter-hour's three colours and three weights, from what was recorded for it. */
+    private fun computeBinColors(i: Int, restingBpm: Int) {
+        val flags = trailFlags[i].toInt() and 0xFF
+        val bpm = trailHr[i].toInt() and 0xFF
+        val steps = trailSteps[i].toInt()
+        val watched = flags and DayBins.FLAG_SAMPLED != 0
+        val worn = flags and DayBins.FLAG_ON_BODY != 0
+        val charging = flags and DayBins.FLAG_CHARGING != 0
+        val asleep = flags and DayBins.FLAG_SLEEP != 0
+
+        // Nothing watched, or nothing measurable about a person: the ring stays empty, and
+        // the hole says so. Off the wrist and on a charger are exactly that case.
+        val measured = watched && worn && !charging
+
+        var pulse = 0
+        var activity = 0
+        var sleep = 0
+        var pulseWeight = VitalRings.MIN_WEIGHT
+        var activityWeight = VitalRings.MIN_WEIGHT
+        var sleepWeight = VitalRings.MIN_WEIGHT
+        if (measured) {
+            // The pulse ring is drawn even where a reading is missing, faintly, so a night
+            // the platform sampled thinly still reads as a night rather than as a gap.
+            pulse = if (bpm > DayBins.NO_BPM) {
+                VitalRings.pulseColor(bpm)
+            } else {
+                VitalRings.faint(VitalRings.PULSE_REST)
+            }
+            pulseWeight = VitalRings.pulseWeight(bpm)
+            if (asleep) {
+                val depth = VitalRings.sleepDepth(bpm, restingBpm)
+                sleep = VitalRings.sleepColor(depth)
+                sleepWeight = VitalRings.sleepWeight(depth)
+            } else {
+                val effort = VitalRings.effort(steps, bpm, restingBpm)
+                activity = VitalRings.activityColor(effort)
+                activityWeight = VitalRings.activityWeight(effort)
+            }
+        }
+
+        pulseColors[i] = pulse
+        activityColors[i] = activity
+        sleepColors[i] = sleep
+        pulseWeights[i] = pulseWeight
+        activityWeights[i] = activityWeight
+        sleepWeights[i] = sleepWeight
+        pulseColorsAmbient[i] = Palette.dimKeepingAlpha(pulse, Palette.AMBIENT_LEVEL)
+        activityColorsAmbient[i] = Palette.dimKeepingAlpha(activity, Palette.AMBIENT_LEVEL)
+        sleepColorsAmbient[i] = Palette.dimKeepingAlpha(sleep, Palette.AMBIENT_LEVEL)
+    }
+
     /** Length of one full turn of the hour hand, in Earth milliseconds. */
     private fun planetPeriodMillis(mode: Int): Double = when (mode) {
         PlanetMode.MARS -> AstroTime.SOL_IN_MILLIS
@@ -833,6 +1207,17 @@ class MfdRenderer(
 
     companion object {
         private const val TAG = "MfdRenderer"
+
+        /** The wellness flavor's `BuildConfig.WORLD`. */
+        const val WORLD_VITAL = "vital"
+
+        /** One bin of the trail, in degrees: a quarter-hour of a twenty-four hour dial. */
+        private const val TRAIL_BIN_SWEEP = 360f / DayBins.BIN_COUNT
+
+        /** The clear window ahead of the hand: two quarter-hours, which is half an hour of dial. */
+        private const val TRAIL_SKIP_BINS = 2
+
+
 
         /**
          * Resting frame period: once a second.

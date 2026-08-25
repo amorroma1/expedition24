@@ -21,6 +21,9 @@ import androidx.wear.watchface.WatchState
 import androidx.wear.watchface.style.CurrentUserStyleRepository
 import androidx.wear.watchface.style.UserStyleSchema
 import com.avdesign.mfd24.data.TelemetryRepository
+import com.avdesign.mfd24.data.VitalMonitor
+import com.avdesign.mfd24.data.VitalStore
+import com.avdesign.mfd24.health.VitalReportActivity
 import com.avdesign.mfd24.data.SensorSlots
 import com.avdesign.mfd24.data.TelemetryWorker
 import com.avdesign.mfd24.data.VigilanceMonitor
@@ -31,6 +34,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
@@ -47,6 +51,9 @@ class MfdWatchFaceService : WatchFaceService() {
     private lateinit var watchShift: WatchShiftController
     private lateinit var vigilance: VigilanceMonitor
     private lateinit var sensorSlots: SensorSlots
+
+    /** Present only on the wellness flavor; every other face leaves it null. */
+    private var vital: VitalMonitor? = null
 
     /** Last slots asked for, so a visibility change can re-apply them without the renderer. */
     private var slotLeft = 0
@@ -87,10 +94,24 @@ class MfdWatchFaceService : WatchFaceService() {
         watchShift = WatchShiftController.get(this)
         vigilance = VigilanceMonitor.get(this)
         sensorSlots = SensorSlots(this)
+        if (BuildConfig.WORLD == MfdRenderer.WORLD_VITAL) {
+            // Constructed here, not at the first frame: it restores the day from storage in its
+            // own constructor, and the trail must be on the dial from the first frame after a
+            // reboot rather than after a recorder has managed to start.
+            vital = VitalMonitor.get(this)
+        }
         if (!TelemetryWorker.scheduleIfUnlocked(this)) {
             registerUnlockReceiver()
         }
     }
+
+    /**
+     * Whether a reading beside the hub is worth a sensor: the face has to be on screen *and* out
+     * of always-on. See the collector in `createWatchFace` for the measurement that put the
+     * ambient half of this condition here.
+     */
+    private fun slotsWanted(watchState: WatchState): Boolean =
+        watchState.isVisible.value == true && watchState.isAmbient.value != true
 
     private fun followBatteryLevel() {
         if (batteryRegistered) return
@@ -115,7 +136,7 @@ class MfdWatchFaceService : WatchFaceService() {
     }
 
     override fun createUserStyleSchema(): UserStyleSchema =
-        StyleSchema.create(resources)
+        StyleSchema.create(resources, BuildConfig.WORLD)
 
     override suspend fun createWatchFace(
         surfaceHolder: SurfaceHolder,
@@ -147,9 +168,30 @@ class MfdWatchFaceService : WatchFaceService() {
                 { left, right ->
                     slotLeft = left
                     slotRight = right
-                    sensorSlots.configure(left, right, watchState.isVisible.value == true)
+                    sensorSlots.configure(left, right, slotsWanted(watchState))
                 }
             },
+            onRecordRequest = if (headless) {
+                { _, _ -> }
+            } else {
+                { recording, interval ->
+                    // Same headless rule as the weather and the monitor: a preview's style must
+                    // not start or stop a service the real face is running.
+                    val monitor = vital
+                    if (monitor != null) {
+                        if (recording) monitor.start(interval) else monitor.stop()
+                    }
+                }
+            },
+            onVitalStyle = if (headless) {
+                { _, _, _ -> }
+            } else {
+                { midnightUp, midnightAs24, sleepOffBody ->
+                    VitalStore(applicationContext)
+                        .saveDialStyle(midnightUp, midnightAs24, sleepOffBody)
+                }
+            },
+            vitalState = vital?.state,
             descriptions = FaceDescriptions(
                 onDuty = getString(R.string.a11y_on_duty),
                 dutyBooked = getString(R.string.a11y_duty_booked),
@@ -177,12 +219,35 @@ class MfdWatchFaceService : WatchFaceService() {
         // network or location work, and must not register receivers their teardown will not undo.
         if (!headless) {
             followBatteryLevel()
+            // The sensors follow the screen being *looked at*, which is not the same as the face
+            // being visible.
+            //
+            // `isVisible` stays true in always-on: the face is on the screen, dimmed, once a
+            // minute. Gating the slots on it alone left the heart-rate LED lit around the clock —
+            // measured on the watch as 15 h 25 m of sensor time out of 15 h 29 m on battery, for a
+            // number that was on a bright screen for eleven minutes of it. Ambient is exactly the
+            // state the original comment describes: nobody is looking.
+            serviceScope.launch {
+                combine(watchState.isVisible, watchState.isAmbient) { visible, ambient ->
+                    visible == true && ambient != true
+                }.collect { awake ->
+                    sensorSlots.configure(slotLeft, slotRight, awake)
+                }
+            }
             serviceScope.launch {
                 watchState.isVisible.collect { visible ->
-                    // The sensors follow the screen. Heart rate means an LED against the wrist, and
-                    // a number nobody is looking at is not worth lighting it for.
-                    sensorSlots.configure(slotLeft, slotRight, visible == true)
-                    if (visible == true) refreshOpportunistically()
+                    if (visible == true) {
+                        // A day whose bins were written while the screen slept has the hand in a
+                        // different bin by the time anybody looks, so the rolling day is rebuilt
+                        // on the way in — cheap arithmetic over 96 slots, no sensors touched.
+                        val now = System.currentTimeMillis()
+                        vital?.republish(now)
+                        // The alarm and the calendar are local reads, so they answer to the
+                        // wrist being raised rather than to the half-hourly job: an alarm set a
+                        // minute ago belongs on the dial now, not at the next refresh.
+                        repository.refreshMarks(now)
+                        refreshOpportunistically()
+                    }
                 }
             }
         }
@@ -223,6 +288,27 @@ class MfdWatchFaceService : WatchFaceService() {
                         }
                         return
                     }
+                    // On the wellness face a double tap opens the day's report — and only ever
+                    // *after* the incident branch above, which returns: while MAN DOWN is on the
+                    // dial the two taps clear it and nothing else, because a safety gesture may
+                    // not be ambiguous with a convenience one.
+                    if (BuildConfig.WORLD == MfdRenderer.WORLD_VITAL) {
+                        val now = System.currentTimeMillis()
+                        val doubled = now - lastTapMillis in 1..DOUBLE_TAP_MILLIS
+                        lastTapMillis = if (doubled) 0L else now
+                        if (doubled) {
+                            runCatching {
+                                startActivity(
+                                    Intent(
+                                        this@MfdWatchFaceService, VitalReportActivity::class.java,
+                                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                )
+                            }.onFailure { Log.w(TAG, "Could not open the day's report", it) }
+                            return
+                        }
+                    }
+                    // The first tap of a report pair acknowledges as well, which is correct
+                    // rather than merely harmless: saying "still here" is never the wrong answer.
                     vigilance.acknowledge()
                 }
             })

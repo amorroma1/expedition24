@@ -71,6 +71,38 @@ class TelemetryState {
     var sunsetMillis: Long = 0L
         private set
 
+    // --- The day's own marks -------------------------------------------------------------------
+
+    /** When the next alarm goes off, or zero for none in the next twenty-four hours. */
+    @Volatile
+    var nextAlarmMillis: Long = 0L
+
+    /** Bumped by every calendar publication; the renderer re-copies only when it moves. */
+    @Volatile
+    var eventsVersion: Int = 0
+        private set
+
+    private var eventCount = 0
+    private val eventStart = LongArray(DayMarks.MAX_EVENTS)
+    private val eventEnd = LongArray(DayMarks.MAX_EVENTS)
+
+    @Synchronized
+    fun setEvents(startMillis: LongArray, endMillis: LongArray, count: Int) {
+        val n = if (count > DayMarks.MAX_EVENTS) DayMarks.MAX_EVENTS else count
+        System.arraycopy(startMillis, 0, eventStart, 0, n)
+        System.arraycopy(endMillis, 0, eventEnd, 0, n)
+        eventCount = n
+        eventsVersion++
+    }
+
+    /** Copies the events into the caller's arrays; returns the count. */
+    @Synchronized
+    fun copyEvents(outStart: LongArray, outEnd: LongArray): Int {
+        System.arraycopy(eventStart, 0, outStart, 0, eventCount)
+        System.arraycopy(eventEnd, 0, outEnd, 0, eventCount)
+        return eventCount
+    }
+
     fun setDaylight(kind: Int, sunriseMillis: Long, sunsetMillis: Long) {
         this.daylightKind = kind
         this.sunriseMillis = sunriseMillis
@@ -82,17 +114,6 @@ class TelemetryState {
         daylightValid = false
     }
 
-    // --- Nearest site ----------------------------------------------------------------------
-
-    /**
-     * Where the position on file came from: [POSITION_NONE], [POSITION_DEVICE] or
-     * [POSITION_MANUAL].
-     *
-     * Both now earn the site lock. That was not always true: the manual entry used to step in
-     * tenths of a degree, and 11 km of quantisation cannot support a 5 km radius. It steps in
-     * hundredths now — about 1.1 km of latitude, less of longitude away from the equator — which
-     * fits inside the radius with room to spare.
-     */
     /**
      * Battery charge, 0..100, or -1 before the first `ACTION_BATTERY_CHANGED` arrives.
      *

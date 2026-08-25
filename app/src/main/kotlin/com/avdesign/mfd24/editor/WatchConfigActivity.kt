@@ -83,6 +83,8 @@ import androidx.wear.watchface.style.UserStyleSetting
 import com.avdesign.mfd24.BuildConfig
 import com.avdesign.mfd24.R
 import com.avdesign.mfd24.export.LogExportActivity
+import com.avdesign.mfd24.health.RawDayExportActivity
+import com.avdesign.mfd24.health.VitalGraphsActivity
 import com.avdesign.mfd24.export.RepoLinkActivity
 import com.avdesign.mfd24.update.ReleaseLinkActivity
 import com.avdesign.mfd24.update.UpdateStore
@@ -198,6 +200,12 @@ class WatchConfigActivity : ComponentActivity() {
 /** Ending a duty on purpose is a decision, not an emergency, so it is not the alarm red. */
 private val Terracotta = Color(0xFFB85C38)
 
+/**
+ * Which face this build's editor sells. A compile-time constant, so the duty half and the
+ * wellness half of the list are decided at build time and R8 drops whichever is dead.
+ */
+private val VITAL_FACE = BuildConfig.WORLD == "vital"
+
 @Composable
 private fun ConfigScreen(
     session: EditorSession,
@@ -233,6 +241,17 @@ private fun ConfigScreen(
         session, StyleSchema.LOG_HEART_RATE, StyleSchema.LOG_HR_OFF
     )
     var weather by rememberOption(session, StyleSchema.WEATHER, StyleSchema.WEATHER_ON)
+    var alarmMark by rememberOption(session, StyleSchema.ALARM_MARK, StyleSchema.ALARM_OFF)
+    var calendarMarks by rememberOption(
+        session, StyleSchema.CALENDAR_MARKS, StyleSchema.CALENDAR_OFF
+    )
+    var record by rememberOption(session, StyleSchema.RECORD, StyleSchema.RECORD_OFF)
+    var recordInterval by rememberOption(
+        session, StyleSchema.RECORD_INTERVAL, StyleSchema.RECORD_INTERVAL_DEFAULT
+    )
+    var sleepOffBody by rememberOption(
+        session, StyleSchema.SLEEP_OFFBODY, StyleSchema.SLEEP_OFFBODY_OFF
+    )
     var ambientDensity by rememberOption(
         session, StyleSchema.AMBIENT_DENSITY, StyleSchema.AMBIENT_FULL
     )
@@ -373,6 +392,109 @@ private fun ConfigScreen(
         // neither START NOW nor ARM TIMER carries a length of its own. Scheduling used to be a
         // section two screens further down, which put the figure it spends out of sight of the rows
         // that set it.
+        // ---- Recorder --------------------------------------------------------------------------
+        // First on the wellness face, where duty control sits on the other one: everything the
+        // trail and the report can say depends on whether this is switched on, and it costs a
+        // service and an LED, so it is asked about before anything cosmetic.
+        if (VITAL_FACE) {
+            item(key = headerKey(SECTION_RECORDER)) {
+                SectionHeader(
+                    text = stringResource(R.string.editor_section_recorder),
+                    expanded = openSection == SECTION_RECORDER,
+                    onClick = { toggleSection(SECTION_RECORDER) },
+                )
+            }
+            if (openSection == SECTION_RECORDER) {
+                item {
+                    SegmentedSetting(
+                        label = stringResource(R.string.editor_label_record),
+                        options = RECORD_OPTIONS,
+                        selectedId = record,
+                        onSelect = { id ->
+                            session.select(StyleSchema.RECORD, id)
+                            record = id
+                            // The two grants the recorder needs are the ones the monitor asks
+                            // for: a watch face cannot raise a dialog, so the switch and the
+                            // request live in the same row.
+                            if (id == StyleSchema.RECORD_ON) {
+                                if (!heldPermission(
+                                        editorContext, Manifest.permission.BODY_SENSORS, grants,
+                                    )
+                                ) {
+                                    onRequestPermission(Manifest.permission.BODY_SENSORS)
+                                } else if (!heldPermission(
+                                        editorContext,
+                                        Manifest.permission.ACTIVITY_RECOGNITION,
+                                        grants,
+                                    )
+                                ) {
+                                    onRequestPermission(Manifest.permission.ACTIVITY_RECOGNITION)
+                                }
+                            }
+                        },
+                    )
+                }
+                item { Hint(stringResource(R.string.editor_record_rationale), hints) }
+                // The day's three records, side on. A row rather than a gesture on the face:
+                // this is where somebody goes deliberately, and the dial's own double tap is
+                // already spoken for by the report.
+                item {
+                    OptionChip(
+                        label = stringResource(R.string.editor_graphs),
+                        selected = false,
+                        onClick = {
+                            editorContext.startActivity(
+                                Intent(editorContext, VitalGraphsActivity::class.java)
+                            )
+                        },
+                    )
+                }
+                // And the grid the graphs are drawn from, unread and uninferred: the thing to
+                // send somebody when the argument is about why a night came back wrong.
+                item {
+                    OptionChip(
+                        label = stringResource(R.string.editor_raw_export),
+                        selected = false,
+                        onClick = {
+                            editorContext.startActivity(
+                                Intent(editorContext, RawDayExportActivity::class.java)
+                            )
+                        },
+                    )
+                }
+                if (record == StyleSchema.RECORD_ON) {
+                    item {
+                        SegmentedSetting(
+                            label = stringResource(R.string.editor_label_record_interval),
+                            options = RECORD_INTERVAL_OPTIONS,
+                            selectedId = recordInterval,
+                            onSelect = { id ->
+                                session.select(StyleSchema.RECORD_INTERVAL, id)
+                                recordInterval = id
+                            },
+                        )
+                    }
+                    // Under the interval, because it only means anything to somebody already
+                    // recording, and off unless they say otherwise: it trades most of what makes
+                    // the sleep reading trustworthy for an answer where there would be none.
+                    item {
+                        SegmentedSetting(
+                            label = stringResource(R.string.editor_label_offbody),
+                            options = OFFBODY_OPTIONS,
+                            selectedId = sleepOffBody,
+                            onSelect = { id ->
+                                session.select(StyleSchema.SLEEP_OFFBODY, id)
+                                sleepOffBody = id
+                            },
+                        )
+                    }
+                    item {
+                        Hint(stringResource(R.string.editor_offbody_rationale), hints)
+                    }
+                }
+            }
+        }
+
         item(key = headerKey(SECTION_DUTY)) {
             SectionHeader(
                 text = stringResource(R.string.editor_section_watch),
@@ -947,6 +1069,45 @@ private fun ConfigScreen(
             if (lunarMark == StyleSchema.LUNAR_ON) {
                 item { Hint(stringResource(R.string.editor_lunar_note), hints) }
             }
+            if (VITAL_FACE) {
+                item {
+                    SegmentedSetting(
+                        label = stringResource(R.string.editor_label_alarm),
+                        options = ALARM_OPTIONS,
+                        selectedId = alarmMark,
+                        onSelect = { id ->
+                            session.select(StyleSchema.ALARM_MARK, id)
+                            alarmMark = id
+                        },
+                    )
+                }
+                if (alarmMark == StyleSchema.ALARM_ON) {
+                    item { Hint(stringResource(R.string.editor_alarm_note), hints) }
+                }
+                item {
+                    SegmentedSetting(
+                        label = stringResource(R.string.editor_label_calendar),
+                        options = CALENDAR_OPTIONS,
+                        selectedId = calendarMarks,
+                        onSelect = { id ->
+                            session.select(StyleSchema.CALENDAR_MARKS, id)
+                            calendarMarks = id
+                            // The grant is collected here, with the switch that needs it: a
+                            // watch face cannot raise a dialog of its own.
+                            if (id == StyleSchema.CALENDAR_ON &&
+                                !heldPermission(
+                                    editorContext, Manifest.permission.READ_CALENDAR, grants,
+                                )
+                            ) {
+                                onRequestPermission(Manifest.permission.READ_CALENDAR)
+                            }
+                        },
+                    )
+                }
+                if (calendarMarks == StyleSchema.CALENDAR_ON) {
+                    item { Hint(stringResource(R.string.editor_calendar_note), hints) }
+                }
+            }
             item {
                 SegmentedSetting(
                     label = stringResource(R.string.editor_label_weather),
@@ -997,14 +1158,16 @@ private fun ConfigScreen(
         // ---- Units -----------------------------------------------------------------------------
         // Both rows labelled: unlabelled, the four chips ran together and the second pair read as
         // more of the first.
-        item(key = headerKey(SECTION_UNITS)) {
+        // Units serve the weather row alone, and the wellness face prints no weather — its
+        // forecast lives in the daylight band's shading, which has no unit to choose.
+        if (!VITAL_FACE) item(key = headerKey(SECTION_UNITS)) {
             SectionHeader(
                 text = stringResource(R.string.editor_section_units),
                 expanded = openSection == SECTION_UNITS,
                 onClick = { toggleSection(SECTION_UNITS) },
             )
         }
-        if (openSection == SECTION_UNITS) {
+        if (openSection == SECTION_UNITS && !VITAL_FACE) {
             item {
                 SegmentedSetting(
                     label = stringResource(R.string.editor_label_temperature),
@@ -1366,6 +1529,12 @@ private const val SECTION_POSITION = 3
 private const val SECTION_DISPLAY = 4
 private const val SECTION_UNITS = 5
 private const val SECTION_ABOUT = 6
+
+/**
+ * The wellness face's recorder, in the slot its duty control vacated: what the day log costs
+ * and how often the pulse is taken are the first thing that face is asked about.
+ */
+private const val SECTION_RECORDER = 7
 
 /** Stable identity for a section header in the lazy list, whatever its index this frame. */
 private fun headerKey(section: Int): String = "header-" + section
@@ -1900,6 +2069,27 @@ private val SOLAR_OPTIONS = listOf(
 private val LUNAR_OPTIONS = listOf(
     Segment(StyleSchema.LUNAR_OFF, R.string.lunar_off, R.string.lunar_off_sr),
     Segment(StyleSchema.LUNAR_ON, R.string.lunar_on, R.string.lunar_on_sr),
+)
+private val ALARM_OPTIONS = listOf(
+    Segment(StyleSchema.ALARM_OFF, R.string.alarm_off, R.string.alarm_off_sr),
+    Segment(StyleSchema.ALARM_ON, R.string.alarm_on, R.string.alarm_on_sr),
+)
+private val CALENDAR_OPTIONS = listOf(
+    Segment(StyleSchema.CALENDAR_OFF, R.string.calendar_off, R.string.calendar_off_sr),
+    Segment(StyleSchema.CALENDAR_ON, R.string.calendar_on, R.string.calendar_on_sr),
+)
+private val RECORD_OPTIONS = listOf(
+    Segment(StyleSchema.RECORD_OFF, R.string.record_off, R.string.record_off_sr),
+    Segment(StyleSchema.RECORD_ON, R.string.record_on, R.string.record_on_sr),
+)
+private val RECORD_INTERVAL_OPTIONS = listOf(
+    Segment("5", R.string.record_5, R.string.record_5_sr),
+    Segment("10", R.string.record_10, R.string.record_10_sr),
+    Segment("15", R.string.record_15, R.string.record_15_sr),
+)
+private val OFFBODY_OPTIONS = listOf(
+    Segment(StyleSchema.SLEEP_OFFBODY_OFF, R.string.offbody_off, R.string.offbody_off_sr),
+    Segment(StyleSchema.SLEEP_OFFBODY_ON, R.string.offbody_on, R.string.offbody_on_sr),
 )
 private val VIGILANCE_OPTIONS = listOf(
     Segment(StyleSchema.VIGILANCE_OFF, R.string.vigilance_off, R.string.vigilance_off_sr),

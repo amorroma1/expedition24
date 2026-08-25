@@ -51,6 +51,18 @@ object SolarTime {
      */
     private const val HORIZON_DEG = -0.833
 
+    /**
+     * Civil twilight: the sun six degrees under, and the last of the light a person can read a
+     * newspaper by. This is the edge that decides whether a walk home is in daylight.
+     */
+    const val CIVIL_DEG = -6.0
+
+    /**
+     * Astronomical twilight: eighteen degrees under, and the moment the sky is as dark as it
+     * will get — the far edge of dawn, the hour a photographer or an observer plans around.
+     */
+    const val ASTRONOMICAL_DEG = -18.0
+
     private const val J2000 = 2451545.0
     private const val MILLIS_PER_DAY = 86_400_000.0
 
@@ -58,7 +70,22 @@ object SolarTime {
      * Fills [out] with the sunrise and sunset bracketing the solar day that contains [epochMillis]
      * at ([latitude], [longitude]), longitude positive east.
      */
-    fun compute(epochMillis: Long, latitude: Double, longitude: Double, out: SolarDay) {
+    fun compute(epochMillis: Long, latitude: Double, longitude: Double, out: SolarDay) =
+        compute(epochMillis, latitude, longitude, HORIZON_DEG, out)
+
+    /**
+     * The same day, for a sun at an arbitrary depth: [HORIZON_DEG] for sunrise and sunset,
+     * [CIVIL_DEG] and [ASTRONOMICAL_DEG] for the two edges of twilight. One function rather than
+     * three, so the dawn a face draws and the dawn it says out loud cannot come from different
+     * arithmetic.
+     */
+    fun compute(
+        epochMillis: Long,
+        latitude: Double,
+        longitude: Double,
+        altitudeDeg: Double,
+        out: SolarDay,
+    ) {
         val julianDay = AstroTime.julianDayUtc(epochMillis)
 
         // Whole days since J2000, shifted so the day is centred on *local* solar noon rather than
@@ -80,7 +107,7 @@ object SolarTime {
 
         val declination = asin(sin(eclipticLongitude * DEG) * sin(OBLIQUITY_DEG * DEG))
 
-        val cosHourAngle = (sin(HORIZON_DEG * DEG) - sin(latitude * DEG) * sin(declination)) /
+        val cosHourAngle = (sin(altitudeDeg * DEG) - sin(latitude * DEG) * sin(declination)) /
             (cos(latitude * DEG) * cos(declination))
 
         if (cosHourAngle < -1.0) {

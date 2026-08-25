@@ -212,6 +212,17 @@ class Palette {
         const val BG_MARS: Int = 0xFF1A0A07.toInt()
         const val BG_MOON: Int = 0xFF121315.toInt()
 
+        /**
+         * Dims a colour the way always-on dims everything — by scaling the channels, never the
+         * alpha — while leaving the alpha exactly where the caller put it. The trail needs both
+         * at once: its alpha already carries how much walking a quarter-hour held, and dimming
+         * that would turn a brisk hour into a still one at nightfall.
+         */
+        fun dimKeepingAlpha(color: Int, level: Float): Int {
+            val alpha = (color ushr 24) and 0xFF
+            return (dim(color, level) and 0x00FFFFFF) or (alpha shl 24)
+        }
+
         fun withAlpha(color: Int, alpha: Int): Int =
             Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
 

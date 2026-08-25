@@ -6,6 +6,7 @@ package com.avdesign.mfd24.data
 import android.content.Context
 import android.location.Location
 import android.util.Log
+import com.avdesign.mfd24.BuildConfig
 import com.avdesign.mfd24.astro.SolarDay
 import com.avdesign.mfd24.astro.SolarTime
 import com.avdesign.mfd24.geo.PoiFormat
@@ -50,6 +51,9 @@ class TelemetryRepository private constructor(context: Context) {
     private val refreshLock = Mutex()
 
     private val solarDay = SolarDay()
+
+    private val eventStart = LongArray(DayMarks.MAX_EVENTS)
+    private val eventEnd = LongArray(DayMarks.MAX_EVENTS)
 
     /**
      * The position everything downstream actually uses: a device fix when there is one, otherwise
@@ -127,6 +131,26 @@ class TelemetryRepository private constructor(context: Context) {
         }
         SolarTime.compute(nowMillis, lat, lon, solarDay)
         state.setDaylight(solarDay.kind, solarDay.sunriseMillis, solarDay.sunsetMillis)
+
+    }
+
+    /**
+     * The next alarm and today's calendar, both cheap and neither on the network. Called from
+     * the periodic refresh and whenever the face becomes visible: an alarm set a minute ago
+     * should be on the dial the next time it is looked at, not half an hour later.
+     */
+    fun refreshMarks(nowMillis: Long) {
+        state.nextAlarmMillis = DayMarks.nextAlarmMillis(appContext, nowMillis)
+        if (!DayMarks.hasCalendarPermission(appContext)) {
+            state.setEvents(eventStart, eventEnd, 0)
+            return
+        }
+        // The window the dial can actually draw: from now round to the same hand position
+        // tomorrow, which is the whole of what a 24-hour face has room to say.
+        val count = DayMarks.calendarEvents(
+            appContext, nowMillis, nowMillis + 24 * 3_600_000L, eventStart, eventEnd,
+        )
+        state.setEvents(eventStart, eventEnd, count)
     }
 
     fun hasLocationPermission(): Boolean = location.hasPermission()
@@ -331,7 +355,15 @@ class TelemetryRepository private constructor(context: Context) {
      * Runs the site search when it could say something new: the position has left the last
      * search's 500 m, or there is no site on the dial to be stale.
      */
+    /**
+     * The wellness face has no site row and ships without the site index, so nothing here may
+     * reach for it: the resolver would open an asset that is not in the APK, and the METAR a
+     * locked aerodrome earns would be weather nobody prints.
+     */
+    private val siteLockAvailable: Boolean = BuildConfig.WORLD != "vital"
+
     private fun maybeResolveSite(lat: Double, lon: Double) {
+        if (!siteLockAvailable) return
         if (resolveOrigin.movedBeyond(lat, lon, RESOLVE_DISTANCE_M) || !state.siteValid) {
             resolveSite(lat, lon)
         }
@@ -364,6 +396,7 @@ class TelemetryRepository private constructor(context: Context) {
      * a decision made after a mixed column burned once (Hostomel was ICAO, Zhuliany was IATA).
      */
     private fun metarIcao(): String? {
+        if (!siteLockAvailable) return null
         if (!state.siteValid || state.siteType != PoiFormat.TYPE_AIRPORT) return null
         if (state.siteFlags and PoiFormat.FLAG_HELIPAD != 0) return null
         val code = CharArray(8)
