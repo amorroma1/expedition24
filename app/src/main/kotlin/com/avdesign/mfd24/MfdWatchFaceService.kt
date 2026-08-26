@@ -31,6 +31,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
@@ -92,6 +93,14 @@ class MfdWatchFaceService : WatchFaceService() {
         }
     }
 
+    /**
+     * Whether a reading beside the hub is worth a sensor: the face has to be on screen *and* out
+     * of always-on. See the collector in `createWatchFace` for the measurement that put the
+     * ambient half of this condition here.
+     */
+    private fun slotsWanted(watchState: WatchState): Boolean =
+        watchState.isVisible.value == true && watchState.isAmbient.value != true
+
     private fun followBatteryLevel() {
         if (batteryRegistered) return
         runCatching {
@@ -147,7 +156,7 @@ class MfdWatchFaceService : WatchFaceService() {
                 { left, right ->
                     slotLeft = left
                     slotRight = right
-                    sensorSlots.configure(left, right, watchState.isVisible.value == true)
+                    sensorSlots.configure(left, right, slotsWanted(watchState))
                 }
             },
             descriptions = FaceDescriptions(
@@ -177,11 +186,23 @@ class MfdWatchFaceService : WatchFaceService() {
         // network or location work, and must not register receivers their teardown will not undo.
         if (!headless) {
             followBatteryLevel()
+            // The sensors follow the screen being *looked at*, which is not the same as the face
+            // being visible.
+            //
+            // `isVisible` stays true in always-on: the face is on the screen, dimmed, once a
+            // minute. Gating the slots on it alone left the heart-rate LED lit around the clock —
+            // measured on the watch as 15 h 25 m of sensor time out of 15 h 29 m on battery, for a
+            // reading that was on a lit screen for eleven minutes of it. Ambient is exactly the
+            // state the old comment described: nobody is looking.
+            serviceScope.launch {
+                combine(watchState.isVisible, watchState.isAmbient) { visible, ambient ->
+                    visible == true && ambient != true
+                }.collect { awake ->
+                    sensorSlots.configure(slotLeft, slotRight, awake)
+                }
+            }
             serviceScope.launch {
                 watchState.isVisible.collect { visible ->
-                    // The sensors follow the screen. Heart rate means an LED against the wrist, and
-                    // a number nobody is looking at is not worth lighting it for.
-                    sensorSlots.configure(slotLeft, slotRight, visible == true)
                     if (visible == true) refreshOpportunistically()
                 }
             }

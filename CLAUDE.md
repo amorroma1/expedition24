@@ -723,7 +723,18 @@ receiver registered in `onCreate` therefore leaked a dispatcher per preview, whi
 reports as `IntentReceiverLeaked` against `WatchFaceControlService`. Anything else registered for the
 life of the face has the same trap.
 
-**The sensor slots run only while the screen is on.** `SensorSlots.configure` is driven from
+**The sensor slots run only while the screen is on — and always-on does not count.**
+`watchState.isVisible` stays true in ambient: the face is on the screen, dimmed, once a minute.
+Gating the slots on visibility alone left the heart-rate LED lit around the clock, and the watch
+said so plainly — `dumpsys batterystats` blamed the face for **15 h 25 m of sensor 0x64 out of
+15 h 29 m on battery**, with the screen interactive for eleven minutes of it, and
+`dumpsys sensorservice` showed the PPG running at 66.7 ms. The gate is `isVisible && !isAmbient`,
+in both the style callback and the collector. When reading that dump: batterystats prints sensor
+handles in decimal, `sensorservice` in hex — 100 is 0x64 heart rate, 105 is 0x69 step counter,
+108 is 0x6c the off-body detector. Found on the wellness face on 2026-08-26 and carried to every
+flavour the same day, because the code is shared and so was the bug.
+
+**The original rule, which the above is the correct expression of:** `SensorSlots.configure` is driven from
 `MfdWatchFaceService`, from both the style (via `onSensorSlots`, reported on a change only) and
 `watchState.isVisible`. Heart rate is an LED against the wrist, so a frame must never be able to
 switch it on and a headless preview must not either — the callback is a no-op for headless
