@@ -188,7 +188,7 @@ degrees lower.
 | **Rover clock** | `PERSEVERANCE` or `CURIOSITY` in the editor. The dial, the daylight, the comm windows and the mission sol all follow the choice — and switching glides the whole dial the short way round the sol, exactly the way the Earth face crosses a time zone. |
 | **Mars daylight** | Sunrise, sunset and twilight from the Allison & McEwen (2000) chain, the algorithm NASA's Mars24 clock runs. Mars's eccentric orbit swings its equation of time through ±50 minutes; no Earth arithmetic would do. |
 | **Direct-to-Earth line** | The inner edge of the tick ring marks when Earth stands above 10° at the rover — pure celestial mechanics, computed offline. In solar conjunction the line thins to a hairline and the readout flies `CONJ`: the geometry holds, the corona is in the way. |
-| **Relay line** | The outer edge marks MRO, Odyssey and TGO passes over the rover, from JPL Horizons ephemerides fetched six-hourly and cached per site. When they cannot be had, the face says `NO EPHEMERIS` rather than drawing an empty sky. |
+| **Relay line** | The outer edge marks orbiter passes over the rover — MRO, Odyssey, MAVEN and TGO, each switchable — from JPL Horizons ephemerides fetched six-hourly and cached per site. Each orbiter stands or falls on its own: MAVEN's published trajectory currently ends in March 2026, so it contributes nothing and says so rather than being quietly dropped. When none can be had the face flies `NO EPHEMERIS` rather than drawing an empty sky. |
 | **Light time** | `SOL 4994` and, behind a ground-station dish, `15:42` — the one-way light time to Earth in real minutes and seconds, live. |
 
 Everything else — the duty arc (moved inside, onto the hour hand's point), the vigilance monitor,
