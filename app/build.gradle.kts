@@ -176,8 +176,8 @@ android {
             applicationIdSuffix = ".mars"
             // An independent version line: the platform compares versionCode per package, so
             // the Mars face does not inherit Earth's 19 releases of history.
-            versionCode = 1
-            versionName = "0.1.0"
+            versionCode = 2
+            versionName = "0.1.1"
             buildConfigField("String", "WORLD", "\"mars\"")
             // "mars-v" cannot collide with Earth's bare "v": ReleaseCheck matches by prefix and
             // then by exact asset name, and neither passes the other flavor's gate.
