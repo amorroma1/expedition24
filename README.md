@@ -191,6 +191,15 @@ degrees lower.
 | **Relay line** | The outer edge marks orbiter passes over the rover — MRO, Odyssey, MAVEN and TGO, each switchable — from JPL Horizons ephemerides fetched six-hourly and cached per site. Each orbiter stands or falls on its own: MAVEN's published trajectory currently ends in March 2026, so it contributes nothing and says so rather than being quietly dropped. When none can be had the face flies `NO EPHEMERIS` rather than drawing an empty sky. |
 | **Light time** | `SOL 4994` and, behind a ground-station dish, `15:42` — the one-way light time to Earth in real minutes and seconds, live. |
 
+**Both comm lines are a view from Mars, taken from the rover's own point on it: where Earth and
+where the orbiters stand in *that* sky, above *that* horizon.** They are windows of visibility and
+nothing more. They do not know whether a Deep Space Network antenna is booked for the pass, whether
+the orbiter has a relay session planned over the site, what the rover's power and thermal budget
+allow, or what the skyline actually looks like from inside a crater — the horizon is taken as flat
+and the threshold as a plain 10°. So the line says *the geometry allows it*, which is the half of
+the question a watch on a wrist can answer honestly and offline; the other half lives in mission
+planning, changes daily, and is not published in any form a dial could trust.
+
 Everything else — the duty arc (moved inside, onto the hour hand's point), the vigilance monitor,
 the incident record — works unchanged, in the rover's own time. What it deliberately lacks:
 weather, the site lock, both sky marks and the unit rows — a rover has no METAR, Earth's moon is
