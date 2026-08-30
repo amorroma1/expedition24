@@ -514,6 +514,32 @@ notification per release; and `ABOUT → RELEASES` names the version and opens `
 in a browser, at a readable size. Two seconds with a phone beat two minutes of scrolling a wall of
 text on a 1.2-inch screen, which is what the old screen was.
 
+**What the always-on sensor gate was worth, measured.** Two runs on one wrist, before and after
+`isVisible && !isAmbient`:
+
+| | on battery | rate | our heart-rate sensor time |
+|---|---|---|---|
+| before | 15 h 29 m, 100 → 77 % | 1.48 %/h | **15 h 25 m** (99.6 % of the run) |
+| after | 2 d 7 h 13 m, 100 → 27 % | **1.32 %/h** | **1 h 31 m** (2.7 %) |
+
+Eleven per cent of battery for thirty-six times less sensor, and the gap between those two figures
+is the lesson: the power model does not know what the optical sensor costs here — our uid was
+blamed for 3.1 mA·h while holding the LED on for fifteen hours, and the rest sat in `idle` and
+`unaccounted`. **Read the sensor *times*, not the per-uid table.** Sensor handles are decimal in
+`batterystats` and hex in `sensorservice`: 100 is 0x64 heart rate, 105 is 0x69 step counter, 108
+is 0x6c the off-body detector.
+
+**Verify an install by its hash, not by its version.** `com.avdesign.mfd24` reported 2.7.0 /
+`versionCode` 19 on the watch — matching the release — and was a *different build of the same
+version*: `ef515a13…` against the published `df5ecb4a…`, differing in `classes.dex`,
+`resources.arsc`, the manifest and the baseline profile. Nothing was wrong with it and nothing
+said so either.
+
+```powershell
+$path = (adb -s <dev> shell "pm path <pkg>") -replace "package:",""
+adb -s <dev> shell "sha256sum $path"      # against the SHA-256 in the release notes
+```
+
 **A release build is the only place minification bugs live.** Selecting the steps slot crashed the
 face on the watch while every emulator check passed, because debug builds are not minified. R8
 renamed the fields proto-lite looks up by name, Health Services' client threw inside a static
@@ -524,15 +550,15 @@ needed: keep rules in `proguard-rules.pro` for the protobuf and Health Services 
 the dial when a fallback is one line below. **Anything reflective has to be exercised on a release
 APK before it ships** — that is now the rule.
 
-**The platform's daily step total is not reachable on this watch.** The Health Services passive
-subscription binds (confirmed in `dumpsys activity services …healthservices`: our package is the
-calling client) and then delivers nothing, so what the row shows is our own count since the slot
-was switched on — the user walked seven steps and saw seven, with a real daily total far higher.
-2.6.4 logs the provider's advertised capabilities and every value it does deliver, which is the
-evidence needed before deciding whether the dependency earns its place. What is certain either
-way: from the next local midnight the counter-and-baseline path is exact, because the boundary is
-recorded; only the installation day is unknowable, and a zero invented on that day is no longer
-published.
+**The platform's daily step total is not merely unreachable on this watch — it is wrong.**
+Settled on 2026-08-30 on the wellness face, which counts for itself as well and could therefore be
+compared: Health Services logged `STEPS_DAILY supported: true; provider offers 11 passive types`
+and delivered **44 steps** for a day in which the same watch's hardware counter, read
+quarter-hour by quarter-hour, had counted **8604**. Not the day, not the time since the
+subscription, not anything — it binds, claims support, and produces a number with no relation to
+the wrist. Where a face has its own record it should prefer it; the duty face has none, so
+`DailySteps` stays there as the only thing available, with the counter-and-baseline path beneath
+it. **This closes the open question these notes carried from 2.5.0.**
 
 **And the evidence that looks like it settles this does not — a mistake made and corrected on
 2026-08-22.** Minutes after 2.7.0 was installed the log read
